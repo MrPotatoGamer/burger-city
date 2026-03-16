@@ -37,3 +37,10 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+bin/
+target/
+*.class
+.settings/
+.project
+.classpath
