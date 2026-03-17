@@ -34,25 +34,23 @@ public class GameUI extends JFrame {
 
         // Egér kezelése: drag (görgetés) és kattintás
         final Point[] dragStart = {null};
+        final boolean[] wasDragged = {false};
 
         mapRenderer.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
                 dragStart[0] = e.getPoint();
+                wasDragged[0] = false;
             }
 
             @Override
             public void mouseReleased(MouseEvent e) {
-                dragStart[0] = null;
-            }
-
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (roadBuildMode && dragStart[0] != null &&
-                    Math.abs(dragStart[0].x - e.getX()) < 3 &&
-                    Math.abs(dragStart[0].y - e.getY()) < 3) {
+                // Ha nem volt drag, akkor kattintás volt
+                if (roadBuildMode && !wasDragged[0]) {
                     handleRoadBuild(e.getX(), e.getY());
                 }
+                dragStart[0] = null;
+                wasDragged[0] = false;
             }
         });
 
@@ -62,6 +60,12 @@ public class GameUI extends JFrame {
                 if (dragStart[0] != null) {
                     int dx = dragStart[0].x - e.getX();
                     int dy = dragStart[0].y - e.getY();
+
+                    // Ha elég nagyot mozgott, az drag
+                    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+                        wasDragged[0] = true;
+                    }
+
                     mapRenderer.getCamera().move(dx, dy);
                     dragStart[0] = e.getPoint();
                     mapRenderer.repaint();
@@ -71,7 +75,7 @@ public class GameUI extends JFrame {
 
         // Egérgörgő zoom
         mapRenderer.addMouseWheelListener(e -> {
-            double zoomFactor = e.getWheelRotation() < 0 ? 1.1 : 0.9;
+            double zoomFactor = e.getWheelRotation() < 0 ? 1.15 : 0.85;
             mapRenderer.getCamera().zoom(zoomFactor, e.getX(), e.getY());
             mapRenderer.repaint();
         });
