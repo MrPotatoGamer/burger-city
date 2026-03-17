@@ -81,10 +81,10 @@ public class Camera {
 
     // Képernyő koordinátából világ koordinátába
     public double screenToWorldX(double screenX) {
-        return (screenX + x) / zoom;
+        return (screenX / zoom) + (x / zoom);
     }
 
     public double screenToWorldY(double screenY) {
-        return (screenY + y) / zoom;
+        return (screenY / zoom) + (y / zoom);
     }
 }
