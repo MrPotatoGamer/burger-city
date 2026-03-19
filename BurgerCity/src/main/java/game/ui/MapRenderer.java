@@ -1,12 +1,16 @@
 package game.ui;
 
 import game.map.*;
+import game.vehicle.Bus;
+import game.vehicle.Truck;
+import game.vehicle.Vehicle;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.util.HashMap;
+import java.util.List;
 
 public class MapRenderer extends JPanel {
 
@@ -16,6 +20,7 @@ public class MapRenderer extends JPanel {
     private final java.util.Map<TileType, Color> tileColors = new HashMap<>();
     private final java.util.Map<IndustryType, Color> industryColors = new HashMap<>();
     private Camera camera;
+    private List<Vehicle> vehicles = List.of();
 
     public MapRenderer(game.map.Map map) {
         this.map = map;
@@ -47,6 +52,11 @@ public class MapRenderer extends JPanel {
 
     public Camera getCamera() {
         return camera;
+    }
+
+    public void setVehicles(List<Vehicle> vehicles) {
+        this.vehicles = (vehicles == null) ? List.of() : vehicles;
+        repaint();
     }
 
     @Override
@@ -115,6 +125,23 @@ public class MapRenderer extends JPanel {
             g2.drawString(ind.getName(), px + 1, py + 1);
             g2.setColor(indColor.brighter());
             g2.drawString(ind.getName(), px, py);
+        }
+
+        // Járművek kirajzolása
+        int vehicleSize = TILE_SIZE / 2;
+        for (Vehicle v : vehicles) {
+            if (v == null) continue;
+            int vx = (int) Math.round(v.getWorldX() - vehicleSize / 2.0);
+            int vy = (int) Math.round(v.getWorldY() - vehicleSize / 2.0);
+
+            Color vehicleColor = Color.WHITE;
+            if (v instanceof Truck) vehicleColor = Color.RED;
+            if (v instanceof Bus) vehicleColor = Color.BLUE;
+
+            g2.setColor(Color.BLACK);
+            g2.fillOval(vx + 1, vy + 1, vehicleSize, vehicleSize);
+            g2.setColor(vehicleColor);
+            g2.fillOval(vx, vy, vehicleSize, vehicleSize);
         }
     }
 

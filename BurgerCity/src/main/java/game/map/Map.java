@@ -1,6 +1,8 @@
 package game.map;
 
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Random;
 
@@ -103,6 +105,124 @@ public class Map {
     public List<Industry> getIndustries() { return industries; }
 
     public void updateForests() {}
+
+    /**
+     * Finds a ROAD-only path between two rectangular areas (e.g., City/Industry footprints).
+     * The path starts at a ROAD tile adjacent to area A and ends at a ROAD tile adjacent to area B.
+     * Returns an empty list if no valid path exists.
+     */
+    public List<int[]> findRoadPathBetweenAreas(int ax, int ay, int aw, int ah,
+                                                int bx, int by, int bw, int bh) {
+        List<int[]> starts = adjacentRoadTiles(ax, ay, aw, ah);
+        if (starts.isEmpty()) return List.of();
+
+        boolean[] isTarget = new boolean[width * height];
+        for (int[] t : adjacentRoadTiles(bx, by, bw, bh)) {
+            isTarget[toKey(t[0], t[1])] = true;
+        }
+        boolean anyTarget = false;
+        for (boolean v : isTarget) {
+            if (v) { anyTarget = true; break; }
+        }
+        if (!anyTarget) return List.of();
+
+        int[] parent = new int[width * height];
+        boolean[] visited = new boolean[width * height];
+        for (int i = 0; i < parent.length; i++) parent[i] = -1;
+
+        Deque<Integer> q = new ArrayDeque<>();
+        for (int[] s : starts) {
+            int key = toKey(s[0], s[1]);
+            if (visited[key]) continue;
+            visited[key] = true;
+            parent[key] = -2;
+            q.addLast(key);
+        }
+
+        int found = -1;
+        while (!q.isEmpty()) {
+            int cur = q.removeFirst();
+            if (isTarget[cur]) {
+                found = cur;
+                break;
+            }
+            int cx = cur / height;
+            int cy = cur % height;
+
+            found = bfsEnqueueRoadNeighbor(cx + 1, cy, cur, visited, parent, q, isTarget);
+            if (found != -1) break;
+            found = bfsEnqueueRoadNeighbor(cx - 1, cy, cur, visited, parent, q, isTarget);
+            if (found != -1) break;
+            found = bfsEnqueueRoadNeighbor(cx, cy + 1, cur, visited, parent, q, isTarget);
+            if (found != -1) break;
+            found = bfsEnqueueRoadNeighbor(cx, cy - 1, cur, visited, parent, q, isTarget);
+            if (found != -1) break;
+        }
+
+        if (found == -1) return List.of();
+
+        // Reconstruct path
+        List<int[]> path = new ArrayList<>();
+        int cur = found;
+        while (cur != -2) {
+            int x = cur / height;
+            int y = cur % height;
+            path.add(new int[]{x, y});
+            cur = parent[cur];
+        }
+
+        // Reverse in-place
+        for (int i = 0, j = path.size() - 1; i < j; i++, j--) {
+            int[] tmp = path.get(i);
+            path.set(i, path.get(j));
+            path.set(j, tmp);
+        }
+        return path;
+    }
+
+    private int bfsEnqueueRoadNeighbor(int nx, int ny, int fromKey,
+                                      boolean[] visited, int[] parent, Deque<Integer> q, boolean[] isTarget) {
+        if (!inBounds(nx, ny)) return -1;
+        Tile t = getTile(nx, ny);
+        if (t == null || t.getType() != TileType.ROAD) return -1;
+        int key = toKey(nx, ny);
+        if (visited[key]) return -1;
+        visited[key] = true;
+        parent[key] = fromKey;
+        if (isTarget[key]) return key;
+        q.addLast(key);
+        return -1;
+    }
+
+    private int toKey(int x, int y) {
+        return x * height + y;
+    }
+
+    private List<int[]> adjacentRoadTiles(int ox, int oy, int w, int h) {
+        List<int[]> result = new ArrayList<>();
+
+        // Above and below
+        for (int x = ox; x < ox + w; x++) {
+            addIfRoad(result, x, oy - 1);
+            addIfRoad(result, x, oy + h);
+        }
+
+        // Left and right
+        for (int y = oy; y < oy + h; y++) {
+            addIfRoad(result, ox - 1, y);
+            addIfRoad(result, ox + w, y);
+        }
+
+        return result;
+    }
+
+    private void addIfRoad(List<int[]> out, int x, int y) {
+        if (!inBounds(x, y)) return;
+        Tile t = getTile(x, y);
+        if (t != null && t.getType() == TileType.ROAD) {
+            out.add(new int[]{x, y});
+        }
+    }
 
     /**
      * Út építése a megadott koordinátára
