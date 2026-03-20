@@ -116,6 +116,10 @@ public class Vehicle {
         return pathTiles != null && !pathTiles.isEmpty();
     }
 
+    public Resource getCurrentCargo() {
+        return currentCargo;
+    }
+
     /**
      * Move along connected ROAD tiles.
      * @param map The game map.
