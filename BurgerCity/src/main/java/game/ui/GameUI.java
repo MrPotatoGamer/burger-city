@@ -24,6 +24,7 @@ public class GameUI extends JFrame {
     private Map map;
     private Player player;
     private JLabel statusBar;
+    private String lastStatusMessage;
     private boolean roadBuildMode = false;
     private JButton buildRoadButton;
     private boolean buyVehicleMode = false;
@@ -120,7 +121,8 @@ public class GameUI extends JFrame {
         add(topPanel, BorderLayout.NORTH);
 
         // Állapotsáv
-        statusBar = new JLabel(" Mini Transport Tycoon | BurgerCity | Pénz: " + player.getMoney() + "$");
+        lastStatusMessage = "Mini Transport Tycoon | BurgerCity";
+        statusBar = new JLabel(" " + lastStatusMessage + " | Pénz: " + player.getMoney() + "$");
         statusBar.setBorder(BorderFactory.createEtchedBorder());
         add(statusBar, BorderLayout.SOUTH);
 
@@ -274,12 +276,34 @@ public class GameUI extends JFrame {
             return;
         }
 
+        // Assignment-aligned constraint: bus transports passengers between cities.
+        if (choice == 0 && (!isCityBuilding(startBuilding) || !isCityBuilding(endBuilding))) {
+            player.addMoney(VEHICLE_COST);
+            updateStatus("Bus csak két város között vásárolható (utas szállítás). Válassz 2 várost!");
+            clearVehicleSelection();
+            return;
+        }
+
         Vehicle v = (choice == 0) ? new Bus() : new Truck();
         v.setPath(path);
         vehicles.add(v);
         mapRenderer.repaint();
         updateStatus("Jármű lehelyezve: " + options[choice] + " | Útvonal: " + startBuilding.name() + " -> " + endBuilding.name());
         clearVehicleSelection();
+    }
+
+    private boolean isCityBuilding(SelectedBuilding b) {
+        if (b == null) return false;
+        for (City c : map.getCities()) {
+            if (c == null) continue;
+            if (c.getOriginX() == b.originX()
+                    && c.getOriginY() == b.originY()
+                    && c.getWidth() == b.width()
+                    && c.getHeight() == b.height()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void clearVehicleSelection() {
@@ -314,16 +338,23 @@ public class GameUI extends JFrame {
         double deltaSeconds = (now - lastTickNanos) / 1_000_000_000.0;
         lastTickNanos = now;
 
+        map.updateEconomy(deltaSeconds);
+
         for (Vehicle v : vehicles) {
             if (v == null) continue;
             v.update(map, deltaSeconds);
+            v.processArrivalEconomy(map, player);
         }
 
         mapRenderer.repaint();
+
+        // Always reflect current money even without new status messages.
+        statusBar.setText(" " + lastStatusMessage + " | Pénz: " + player.getMoney() + "$");
     }
 
     private void updateStatus(String message) {
-        statusBar.setText(" " + message + " | Pénz: " + player.getMoney() + "$");
+        lastStatusMessage = message;
+        statusBar.setText(" " + lastStatusMessage + " | Pénz: " + player.getMoney() + "$");
     }
 
     public static void main(String[] args) {

@@ -1,8 +1,13 @@
 package game.vehicle;
 
 import game.route.Route;
+import game.core.Player;
+import game.core.ResourcePrices;
 import game.resource.Resource;
+import game.resource.ResourceType;
 import game.building.Garage;
+import game.map.City;
+import game.map.Industry;
 import game.map.Map;
 import game.map.Tile;
 import game.map.TileType;
@@ -45,6 +50,8 @@ public class Vehicle {
     protected List<int[]> pathTiles = List.of();
     protected int pathIndex = 0;
     protected boolean pathForward = true;
+
+    private boolean arrivedThisUpdate = false;
 
     public Vehicle() {
         // Interpreted as tiles per second (converted internally to pixels/sec)
@@ -152,6 +159,30 @@ public class Vehicle {
         worldY += (dy / dist) * step;
     }
 
+    /**
+     * Minimal economy hook: call after {@link #update(Map, double)}.
+     * Acts only when the vehicle arrived at a tile in the last update, and only at path endpoints.
+     */
+    public void processArrivalEconomy(Map map, Player player) {
+        if (!arrivedThisUpdate) return;
+        arrivedThisUpdate = false;
+        if (map == null || player == null) return;
+
+        if (!hasPath() || pathTiles.size() < 2) return;
+        int idx = indexOfTile(pathTiles, currentTileX, currentTileY);
+        if (idx != 0 && idx != pathTiles.size() - 1) return;
+
+        City adjacentCity = findAdjacentCity(map, currentTileX, currentTileY);
+        Industry adjacentIndustry = findAdjacentIndustry(map, currentTileX, currentTileY);
+
+        // Prioritize a city if both are adjacent (rare, but can happen in tight maps).
+        if (adjacentCity != null) {
+            handleCityInteraction(adjacentCity, player);
+        } else if (adjacentIndustry != null) {
+            handleIndustryInteraction(adjacentIndustry, player);
+        }
+    }
+
     protected void arriveAtTarget(Map map) {
         if (targetTileX == null || targetTileY == null) return;
         previousTileX = currentTileX;
@@ -166,6 +197,8 @@ public class Vehicle {
         currentTileY = newTileY;
         targetTileX = null;
         targetTileY = null;
+
+        arrivedThisUpdate = true;
         chooseNextTarget(map);
     }
 
@@ -258,4 +291,94 @@ public class Vehicle {
     }
 
     public void goToGarage() {}
+
+    protected boolean canCarry(ResourceType type) {
+        return true;
+    }
+
+    private void handleCityInteraction(City city, Player player) {
+        if (city == null) return;
+
+        if (currentCargo == null || currentCargo.isEmpty()) {
+            // Load passengers only (goods are not produced by cities in this minimal model).
+            if (!canCarry(ResourceType.PASSENGERS)) return;
+            int taken = city.load(ResourceType.PASSENGERS, Math.max(0, capacity));
+            if (taken > 0) {
+                currentCargo = new Resource(ResourceType.PASSENGERS, taken);
+            }
+            return;
+        }
+
+        // Unload.
+        ResourceType type = currentCargo.getType();
+        int amount = currentCargo.getAmount();
+        if (amount <= 0) return;
+
+        int accepted = city.deliver(type, amount);
+        accepted = Math.max(0, Math.min(accepted, amount));
+        if (accepted <= 0) return;
+
+        int revenue = accepted * ResourcePrices.revenuePerUnit(type);
+        if (revenue != 0) player.addMoney(revenue);
+        currentCargo.removeUpTo(accepted);
+        if (currentCargo.isEmpty()) currentCargo = null;
+    }
+
+    private void handleIndustryInteraction(Industry industry, Player player) {
+        if (industry == null) return;
+
+        if (currentCargo == null || currentCargo.isEmpty()) {
+            // Load one of the industry's produced goods.
+            for (ResourceType type : industry.getProfile().getOutputsPerUnit().keySet()) {
+                if (type == null) continue;
+                if (type == ResourceType.PASSENGERS) continue;
+                if (!canCarry(type)) continue;
+
+                int taken = industry.takeFromStorage(type, Math.max(0, capacity));
+                if (taken > 0) {
+                    currentCargo = new Resource(type, taken);
+                    return;
+                }
+            }
+            return;
+        }
+
+        // Deliver inputs to industries that consume them.
+        ResourceType type = currentCargo.getType();
+        int amount = currentCargo.getAmount();
+        if (amount <= 0) return;
+
+        if (!industry.consumes(type)) return;
+        industry.deliverToStorage(type, amount);
+
+        int revenue = amount * ResourcePrices.revenuePerUnit(type);
+        if (revenue != 0) player.addMoney(revenue);
+        currentCargo = null;
+    }
+
+    private static City findAdjacentCity(Map map, int roadX, int roadY) {
+        for (City c : map.getCities()) {
+            if (c == null) continue;
+            if (c.occupies(roadX + 1, roadY)
+                    || c.occupies(roadX - 1, roadY)
+                    || c.occupies(roadX, roadY + 1)
+                    || c.occupies(roadX, roadY - 1)) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    private static Industry findAdjacentIndustry(Map map, int roadX, int roadY) {
+        for (Industry i : map.getIndustries()) {
+            if (i == null) continue;
+            if (i.occupies(roadX + 1, roadY)
+                    || i.occupies(roadX - 1, roadY)
+                    || i.occupies(roadX, roadY + 1)
+                    || i.occupies(roadX, roadY - 1)) {
+                return i;
+            }
+        }
+        return null;
+    }
 }

@@ -30,8 +30,12 @@ public class MapRenderer extends JPanel {
         tileColors.put(TileType.INDUSTRY, new Color(200, 140, 60));
         tileColors.put(TileType.ROAD,     new Color(80, 80, 80));
 
-        industryColors.put(IndustryType.FARM,    new Color(160, 210, 80));
-        industryColors.put(IndustryType.FACTORY, new Color(180, 100, 100));
+        industryColors.put(IndustryType.FARM,           new Color(160, 210, 80));
+        industryColors.put(IndustryType.RANCH,          new Color(180, 200, 120));
+        industryColors.put(IndustryType.BAKERY,         new Color(220, 180, 120));
+        industryColors.put(IndustryType.PATTY_PLANT,    new Color(200, 130, 130));
+        industryColors.put(IndustryType.BURGER_FACTORY, new Color(180, 100, 100));
+        industryColors.put(IndustryType.FACTORY,        new Color(180, 100, 100));
 
         setBackground(Color.BLACK);
 

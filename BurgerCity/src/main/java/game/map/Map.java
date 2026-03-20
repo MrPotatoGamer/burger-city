@@ -34,17 +34,19 @@ public class Map {
         addCity(new City("Factory District", 40, 30, 5, 5));   // Ipari város jobb alsó sarokban
         addCity(new City("Green Hills", 20, 15, 6, 5));        // Középső város
 
-        // Ipari létesítmények - nagyobb méretűek és több van belőlük
-        // Farmok
+        // Ipari létesítmények
+        // Supply chain:
+        // FARM(WHEAT) -> BAKERY(BREAD)
+        // RANCH(MEAT) -> PATTY_PLANT(MEAT_PATTY)
+        // BREAD + MEAT_PATTY -> BURGER_FACTORY(HAMBURGER)
         addIndustry(new Industry("Green Farm", IndustryType.FARM, 2, 15, 5, 4));
         addIndustry(new Industry("Wheat Fields", IndustryType.FARM, 15, 5, 6, 3));
         addIndustry(new Industry("Valley Farm", IndustryType.FARM, 12, 32, 5, 5));
-        addIndustry(new Industry("North Farm", IndustryType.FARM, 30, 15, 4, 4));
+        addIndustry(new Industry("North Ranch", IndustryType.RANCH, 30, 15, 4, 4));
 
-        // Gyárak
-        addIndustry(new Industry("Burger Factory", IndustryType.FACTORY, 25, 25, 4, 5));
-        addIndustry(new Industry("Meat Processing", IndustryType.FACTORY, 35, 20, 5, 4));
-        addIndustry(new Industry("Food Plant", IndustryType.FACTORY, 15, 25, 4, 3));
+        addIndustry(new Industry("Food Plant", IndustryType.BAKERY, 15, 25, 4, 3));
+        addIndustry(new Industry("Meat Processing", IndustryType.PATTY_PLANT, 35, 20, 5, 4));
+        addIndustry(new Industry("Burger Factory", IndustryType.BURGER_FACTORY, 25, 25, 4, 5));
     }
 
     private void initGrass() {
@@ -103,6 +105,19 @@ public class Map {
     public int getHeight() { return height; }
     public List<City> getCities() { return cities; }
     public List<Industry> getIndustries() { return industries; }
+
+    /**
+     * Economy tick: updates city demand/passenger generation and industry production.
+     */
+    public void updateEconomy(double deltaSeconds) {
+        if (deltaSeconds <= 0) return;
+        for (City c : cities) {
+            if (c != null) c.update(deltaSeconds);
+        }
+        for (Industry i : industries) {
+            if (i != null) i.update(deltaSeconds);
+        }
+    }
 
     public void updateForests() {}
 
