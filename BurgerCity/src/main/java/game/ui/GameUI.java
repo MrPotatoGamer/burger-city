@@ -103,8 +103,14 @@ public class GameUI extends JFrame {
 
         // Egérgörgő zoom
         mapRenderer.addMouseWheelListener(e -> {
-            double zoomFactor = e.getWheelRotation() < 0 ? 1.15 : 0.85;
-            mapRenderer.getCamera().zoom(zoomFactor, e.getX(), e.getY());
+            double zoomFactor = Math.pow(1.1, -e.getWheelRotation());
+
+            var camera = mapRenderer.getCamera();
+            double newZoom = camera.getZoom() * zoomFactor;
+
+            if (newZoom < 0.1 || newZoom > 10) return;
+
+            camera.zoom(zoomFactor, e.getX(), e.getY());
             mapRenderer.repaint();
         });
 
