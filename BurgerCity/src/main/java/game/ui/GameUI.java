@@ -34,6 +34,9 @@ public class GameUI extends JFrame {
     private long lastTickNanos;
     private Timer gameTimer;
 
+    private GameDashboard dashboard;
+    private int dashboardRefreshCounter = 0;
+
     private SelectedBuilding startBuilding;
     private SelectedBuilding endBuilding;
 
@@ -116,6 +119,10 @@ public class GameUI extends JFrame {
 
         add(mapRenderer, BorderLayout.CENTER);
 
+        // Dashboard panel (right side)
+        dashboard = new GameDashboard(player, map, vehicles);
+        add(dashboard, BorderLayout.EAST);
+
         // Felső panel gombokkal
         JPanel topPanel = new JPanel();
         topPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
@@ -142,7 +149,7 @@ public class GameUI extends JFrame {
         gameTimer.start();
 
         pack();
-        setSize(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT);
+        setSize(INITIAL_WINDOW_WIDTH + 310, INITIAL_WINDOW_HEIGHT);
         setLocationRelativeTo(null);
         setResizable(true);
     }
@@ -355,6 +362,13 @@ public class GameUI extends JFrame {
             if (v == null) continue;
             v.update(map, deltaSeconds);
             v.processArrivalEconomy(map, player);
+        }
+
+        // Refresh dashboard every ~30 frames (~0.5 seconds) to keep it responsive but efficient
+        dashboardRefreshCounter++;
+        if (dashboardRefreshCounter >= 30) {
+            dashboardRefreshCounter = 0;
+            dashboard.refresh();
         }
 
         mapRenderer.repaint();
