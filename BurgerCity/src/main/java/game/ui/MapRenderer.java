@@ -29,6 +29,7 @@ public class MapRenderer extends JPanel {
         tileColors.put(TileType.CITY,     new Color(180, 180, 180));
         tileColors.put(TileType.INDUSTRY, new Color(200, 140, 60));
         tileColors.put(TileType.ROAD,     new Color(80, 80, 80));
+        tileColors.put(TileType.BUILDING, Color.GRAY);
 
         industryColors.put(IndustryType.FARM,           new Color(160, 210, 80));
         industryColors.put(IndustryType.RANCH,          new Color(180, 200, 120));
@@ -103,6 +104,14 @@ public class MapRenderer extends JPanel {
                 g2.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                 g2.setColor(Color.BLACK);
                 g2.drawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+                if (tile.getType() == TileType.BUILDING && tile.getPlacedBuilding() != null) {
+                    String label = tile.getPlacedBuilding().getName();
+                    String letter = (label == null || label.isEmpty()) ? "B" : label.substring(0, 1).toUpperCase();
+                    g2.setColor(Color.BLACK);
+                    g2.setFont(new Font("Arial", Font.BOLD, 12));
+                    g2.drawString(letter, x * TILE_SIZE + 12, y * TILE_SIZE + 20);
+                }
             }
         }
 

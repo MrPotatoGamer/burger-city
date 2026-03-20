@@ -1,10 +1,16 @@
 package game.ui;
 
+import game.building.Garage;
 import game.building.Road;
+import game.building.Stop;
+import game.building.TrafficLight;
 import game.core.Player;
 import game.map.City;
 import game.map.Industry;
+import game.map.IndustryType;
 import game.map.Map;
+import game.map.Tile;
+import game.map.TileType;
 import game.vehicle.Bus;
 import game.vehicle.Truck;
 import game.vehicle.Vehicle;
@@ -19,6 +25,8 @@ import java.util.List;
 public class GameUI extends JFrame {
 
     private static final int VEHICLE_COST = 500;
+    private static final int BUILDING_COST = 1000;
+    private static final int INDUSTRY_COST = 1000;
 
     private MapRenderer mapRenderer;
     private Map map;
@@ -29,6 +37,23 @@ public class GameUI extends JFrame {
     private JButton buildRoadButton;
     private boolean buyVehicleMode = false;
     private JButton buyVehicleButton;
+
+    private boolean buyBuildingMode = false;
+    private JButton buyBuildingButton;
+    private BuildableBuilding selectedBuildableBuilding;
+
+    private boolean buyIndustryMode = false;
+    private JButton buyIndustryButton;
+    private IndustryType selectedIndustryType;
+
+    private boolean demolishMode = false;
+    private JButton demolishButton;
+
+    private enum BuildableBuilding {
+        GARAGE,
+        STOP,
+        TRAFFIC_LIGHT
+    }
 
     private final List<Vehicle> vehicles = new ArrayList<>();
     private long lastTickNanos;
@@ -80,6 +105,12 @@ public class GameUI extends JFrame {
                     handleRoadBuild(e.getX(), e.getY());
                 } else if (buyVehicleMode && !wasDragged[0]) {
                     handleBuyVehicleClick(e.getX(), e.getY());
+                } else if (buyBuildingMode && !wasDragged[0]) {
+                    handleBuildingBuild(e.getX(), e.getY());
+                } else if (buyIndustryMode && !wasDragged[0]) {
+                    handleIndustryBuild(e.getX(), e.getY());
+                } else if (demolishMode && !wasDragged[0]) {
+                    handleDemolishClick(e.getX(), e.getY());
                 } else if (!wasDragged[0]) {
                     // No mode active — inspect clicked building
                     handleInspectClick(e.getX(), e.getY());
@@ -131,13 +162,25 @@ public class GameUI extends JFrame {
         JPanel topPanel = new JPanel();
         topPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
 
-        buildRoadButton = new JButton("Út építés (100$)");
+        buildRoadButton = new JButton("Út építés (" + Road.COST + "$)");
         buildRoadButton.addActionListener(e -> toggleRoadBuildMode());
         topPanel.add(buildRoadButton);
 
         buyVehicleButton = new JButton("Jármű vásárlás");
         buyVehicleButton.addActionListener(e -> toggleBuyVehicleMode());
         topPanel.add(buyVehicleButton);
+
+        buyBuildingButton = new JButton("Épület vásárlás");
+        buyBuildingButton.addActionListener(e -> toggleBuyBuildingMode());
+        topPanel.add(buyBuildingButton);
+
+        buyIndustryButton = new JButton("Industry vásárlás");
+        buyIndustryButton.addActionListener(e -> toggleBuyIndustryMode());
+        topPanel.add(buyIndustryButton);
+
+        demolishButton = new JButton("Rombolás");
+        demolishButton.addActionListener(e -> toggleDemolishMode());
+        topPanel.add(demolishButton);
 
         toggleDashboardButton = new JButton("Dashboard \u25C0");
         toggleDashboardButton.addActionListener(e -> toggleDashboard());
@@ -172,12 +215,29 @@ public class GameUI extends JFrame {
                 buyVehicleButton.setText("Jármű vásárlás");
                 clearVehicleSelection();
             }
+            if (buyBuildingMode) {
+                buyBuildingMode = false;
+                buyBuildingButton.setBackground(null);
+                buyBuildingButton.setText("Épület vásárlás");
+                selectedBuildableBuilding = null;
+            }
+            if (buyIndustryMode) {
+                buyIndustryMode = false;
+                buyIndustryButton.setBackground(null);
+                buyIndustryButton.setText("Industry vásárlás");
+                selectedIndustryType = null;
+            }
+            if (demolishMode) {
+                demolishMode = false;
+                demolishButton.setBackground(null);
+                demolishButton.setText("Rombolás");
+            }
             buildRoadButton.setBackground(Color.GREEN);
-            buildRoadButton.setText("Út építés BE (100$)");
+            buildRoadButton.setText("Út építés BE (" + Road.COST + "$)");
             updateStatus("Kattints a térképre az út építéséhez!");
         } else {
             buildRoadButton.setBackground(null);
-            buildRoadButton.setText("Út építés (100$)");
+            buildRoadButton.setText("Út építés (" + Road.COST + "$)");
             updateStatus("Út építés mód kikapcsolva.");
         }
     }
@@ -189,7 +249,24 @@ public class GameUI extends JFrame {
             if (roadBuildMode) {
                 roadBuildMode = false;
                 buildRoadButton.setBackground(null);
-                buildRoadButton.setText("Út építés (100$)");
+                buildRoadButton.setText("Út építés (" + Road.COST + "$)");
+            }
+            if (buyBuildingMode) {
+                buyBuildingMode = false;
+                buyBuildingButton.setBackground(null);
+                buyBuildingButton.setText("Épület vásárlás");
+                selectedBuildableBuilding = null;
+            }
+            if (buyIndustryMode) {
+                buyIndustryMode = false;
+                buyIndustryButton.setBackground(null);
+                buyIndustryButton.setText("Industry vásárlás");
+                selectedIndustryType = null;
+            }
+            if (demolishMode) {
+                demolishMode = false;
+                demolishButton.setBackground(null);
+                demolishButton.setText("Rombolás");
             }
             buyVehicleButton.setBackground(Color.GREEN);
             buyVehicleButton.setText("Jármű vásárlás BE (" + VEHICLE_COST + "$)");
@@ -200,6 +277,182 @@ public class GameUI extends JFrame {
             buyVehicleButton.setText("Jármű vásárlás");
             clearVehicleSelection();
             updateStatus("Jármű vásárlás mód kikapcsolva.");
+        }
+    }
+
+    private void toggleBuyBuildingMode() {
+        buyBuildingMode = !buyBuildingMode;
+        if (buyBuildingMode) {
+            // Módok kizárják egymást
+            if (roadBuildMode) {
+                roadBuildMode = false;
+                buildRoadButton.setBackground(null);
+                buildRoadButton.setText("Út építés (" + Road.COST + "$)");
+            }
+            if (buyVehicleMode) {
+                buyVehicleMode = false;
+                buyVehicleButton.setBackground(null);
+                buyVehicleButton.setText("Jármű vásárlás");
+                clearVehicleSelection();
+            }
+            if (buyIndustryMode) {
+                buyIndustryMode = false;
+                buyIndustryButton.setBackground(null);
+                buyIndustryButton.setText("Industry vásárlás");
+                selectedIndustryType = null;
+            }
+            if (demolishMode) {
+                demolishMode = false;
+                demolishButton.setBackground(null);
+                demolishButton.setText("Rombolás");
+            }
+
+            BuildableBuilding chosen = chooseBuildableBuilding();
+            if (chosen == null) {
+                buyBuildingMode = false;
+                buyBuildingButton.setBackground(null);
+                buyBuildingButton.setText("Épület vásárlás");
+                updateStatus("Épület vásárlás megszakítva.");
+                return;
+            }
+            selectedBuildableBuilding = chosen;
+
+            buyBuildingButton.setBackground(Color.GREEN);
+            buyBuildingButton.setText("Épület vásárlás BE (" + BUILDING_COST + "$)");
+            updateStatus("Kattints a térképre az épület lerakásához: " + selectedBuildableBuilding);
+        } else {
+            buyBuildingButton.setBackground(null);
+            buyBuildingButton.setText("Épület vásárlás");
+            selectedBuildableBuilding = null;
+            updateStatus("Épület vásárlás mód kikapcsolva.");
+        }
+    }
+
+    private BuildableBuilding chooseBuildableBuilding() {
+        Object[] options = {"Garage", "Stop", "TrafficLight"};
+        int choice = JOptionPane.showOptionDialog(
+                this,
+                "Válassz épület típust (mindegyik ára: " + BUILDING_COST + "$):",
+                "Épület vásárlás",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+        return switch (choice) {
+            case 0 -> BuildableBuilding.GARAGE;
+            case 1 -> BuildableBuilding.STOP;
+            case 2 -> BuildableBuilding.TRAFFIC_LIGHT;
+            default -> null;
+        };
+    }
+
+    private void toggleBuyIndustryMode() {
+        buyIndustryMode = !buyIndustryMode;
+        if (buyIndustryMode) {
+            // Módok kizárják egymást
+            if (roadBuildMode) {
+                roadBuildMode = false;
+                buildRoadButton.setBackground(null);
+                buildRoadButton.setText("Út építés (" + Road.COST + "$)");
+            }
+            if (buyVehicleMode) {
+                buyVehicleMode = false;
+                buyVehicleButton.setBackground(null);
+                buyVehicleButton.setText("Jármű vásárlás");
+                clearVehicleSelection();
+            }
+            if (buyBuildingMode) {
+                buyBuildingMode = false;
+                buyBuildingButton.setBackground(null);
+                buyBuildingButton.setText("Épület vásárlás");
+                selectedBuildableBuilding = null;
+            }
+            if (demolishMode) {
+                demolishMode = false;
+                demolishButton.setBackground(null);
+                demolishButton.setText("Rombolás");
+            }
+
+            IndustryType chosen = chooseIndustryType();
+            if (chosen == null) {
+                buyIndustryMode = false;
+                buyIndustryButton.setBackground(null);
+                buyIndustryButton.setText("Industry vásárlás");
+                updateStatus("Industry vásárlás megszakítva.");
+                return;
+            }
+            selectedIndustryType = chosen;
+
+            buyIndustryButton.setBackground(Color.GREEN);
+            buyIndustryButton.setText("Industry vásárlás BE (" + INDUSTRY_COST + "$)");
+            updateStatus("Kattints a térképre az industry lerakásához (2x2): " + selectedIndustryType);
+        } else {
+            buyIndustryButton.setBackground(null);
+            buyIndustryButton.setText("Industry vásárlás");
+            selectedIndustryType = null;
+            updateStatus("Industry vásárlás mód kikapcsolva.");
+        }
+    }
+
+    private IndustryType chooseIndustryType() {
+        Object[] options = {"Farm", "Ranch", "Bakery", "Patty Plant", "Burger Factory", "Factory"};
+        int choice = JOptionPane.showOptionDialog(
+                this,
+                "Válassz industry típust (ára: " + INDUSTRY_COST + "$ | foglal: 2x2):",
+                "Industry vásárlás",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+        return switch (choice) {
+            case 0 -> IndustryType.FARM;
+            case 1 -> IndustryType.RANCH;
+            case 2 -> IndustryType.BAKERY;
+            case 3 -> IndustryType.PATTY_PLANT;
+            case 4 -> IndustryType.BURGER_FACTORY;
+            case 5 -> IndustryType.FACTORY;
+            default -> null;
+        };
+    }
+
+    private void toggleDemolishMode() {
+        demolishMode = !demolishMode;
+        if (demolishMode) {
+            if (roadBuildMode) {
+                roadBuildMode = false;
+                buildRoadButton.setBackground(null);
+                buildRoadButton.setText("Út építés (" + Road.COST + "$)");
+            }
+            if (buyVehicleMode) {
+                buyVehicleMode = false;
+                buyVehicleButton.setBackground(null);
+                buyVehicleButton.setText("Jármű vásárlás");
+                clearVehicleSelection();
+            }
+            if (buyBuildingMode) {
+                buyBuildingMode = false;
+                buyBuildingButton.setBackground(null);
+                buyBuildingButton.setText("Épület vásárlás");
+                selectedBuildableBuilding = null;
+            }
+            if (buyIndustryMode) {
+                buyIndustryMode = false;
+                buyIndustryButton.setBackground(null);
+                buyIndustryButton.setText("Industry vásárlás");
+                selectedIndustryType = null;
+            }
+
+            demolishButton.setBackground(Color.GREEN);
+            demolishButton.setText("Rombolás BE");
+            updateStatus("Kattints egy útra / épületre / industry-re a romboláshoz (út: 0$ vissza, épület: 50%, industry: 50%).");
+        } else {
+            demolishButton.setBackground(null);
+            demolishButton.setText("Rombolás");
+            updateStatus("Rombolás mód kikapcsolva.");
         }
     }
 
@@ -227,6 +480,157 @@ public class GameUI extends JFrame {
             player.addMoney(Road.COST);
             updateStatus("Erre a mezőre nem építhető út!");
         }
+    }
+
+    private void handleBuildingBuild(int screenX, int screenY) {
+        if (selectedBuildableBuilding == null) {
+            updateStatus("Nincs kiválasztott épület típus. Kapcsold be újra az Épület vásárlást.");
+            return;
+        }
+
+        int tileSize = 32;
+        Camera camera = mapRenderer.getCamera();
+        double worldX = camera.screenToWorldX(screenX);
+        double worldY = camera.screenToWorldY(screenY);
+        int tileX = (int) (worldX / tileSize);
+        int tileY = (int) (worldY / tileSize);
+
+        Tile targetTile = map.getTile(tileX, tileY);
+        if (targetTile == null) {
+            updateStatus("Ide nem lehet építeni (térképen kívül): (" + tileX + ", " + tileY + ").");
+            return;
+        }
+
+        if (targetTile.getType() != TileType.GRASS) {
+            updateStatus("Csak üres fű mezőre lehet épületet rakni! Aktuális: " + targetTile.getType() + ".");
+            return;
+        }
+
+        if (targetTile.isOccupied()) {
+            updateStatus("Ez a mező foglalt, ide nem lehet építeni.");
+            return;
+        }
+
+        if (!player.spendMoney(BUILDING_COST)) {
+            updateStatus("Nincs elég pénz az épület vásárlásához! Szükséges: " + BUILDING_COST + "$");
+            return;
+        }
+
+        var building = switch (selectedBuildableBuilding) {
+            case GARAGE -> new Garage(tileX, tileY);
+            case STOP -> new Stop(tileX, tileY);
+            case TRAFFIC_LIGHT -> new TrafficLight(tileX, tileY);
+        };
+
+        if (map.buildBuilding(tileX, tileY, building)) {
+            mapRenderer.repaint();
+            updateStatus("Épület sikeresen lerakva: " + building.getName() + " (" + tileX + ", " + tileY + "). Pénz: " + player.getMoney() + "$");
+        } else {
+            player.addMoney(BUILDING_COST);
+            updateStatus("Erre a mezőre nem építhető épület!");
+        }
+    }
+
+    private void handleIndustryBuild(int screenX, int screenY) {
+        if (selectedIndustryType == null) {
+            updateStatus("Nincs kiválasztott industry típus. Kapcsold be újra az Industry vásárlást.");
+            return;
+        }
+
+        int tileSize = 32;
+        Camera camera = mapRenderer.getCamera();
+        double worldX = camera.screenToWorldX(screenX);
+        double worldY = camera.screenToWorldY(screenY);
+        int tileX = (int) (worldX / tileSize);
+        int tileY = (int) (worldY / tileSize);
+
+        // Pre-check the whole 2x2 footprint so we can explain failures.
+        Tile t00 = map.getTile(tileX, tileY);
+        Tile t10 = map.getTile(tileX + 1, tileY);
+        Tile t01 = map.getTile(tileX, tileY + 1);
+        Tile t11 = map.getTile(tileX + 1, tileY + 1);
+        if (t00 == null || t10 == null || t01 == null || t11 == null) {
+            updateStatus("Az industry 2x2-t foglal, itt nem fér el (térképen kívül). ");
+            return;
+        }
+
+        Tile[] footprint = {t00, t10, t01, t11};
+        for (Tile t : footprint) {
+            if (t.getType() != TileType.GRASS) {
+                updateStatus("Az industry csak üres fűre tehető (2x2). Talált: " + t.getType() + ".");
+                return;
+            }
+            if (t.isOccupied()) {
+                updateStatus("Az industry helye foglalt (2x2 terület). ");
+                return;
+            }
+        }
+
+        if (!player.spendMoney(INDUSTRY_COST)) {
+            updateStatus("Nincs elég pénz industry vásárlásához! Szükséges: " + INDUSTRY_COST + "$");
+            return;
+        }
+
+        if (map.buildIndustry(tileX, tileY, selectedIndustryType)) {
+            mapRenderer.repaint();
+            updateStatus("Industry sikeresen lerakva: " + selectedIndustryType + " (" + tileX + ", " + tileY + ") [2x2]. Pénz: " + player.getMoney() + "$");
+        } else {
+            player.addMoney(INDUSTRY_COST);
+            updateStatus("Erre a helyre nem tehető industry (2x2)!");
+        }
+    }
+
+    private void handleDemolishClick(int screenX, int screenY) {
+        int tileSize = 32;
+        Camera camera = mapRenderer.getCamera();
+        double worldX = camera.screenToWorldX(screenX);
+        double worldY = camera.screenToWorldY(screenY);
+        int tileX = (int) (worldX / tileSize);
+        int tileY = (int) (worldY / tileSize);
+
+        Tile tile = map.getTile(tileX, tileY);
+        if (tile == null) {
+            updateStatus("Érvénytelen mező.");
+            return;
+        }
+
+        if (tile.getType() == TileType.ROAD) {
+            if (map.demolishRoad(tileX, tileY)) {
+                mapRenderer.repaint();
+                updateStatus("Út lerombolva (" + tileX + ", " + tileY + "). Visszatérítés: 0$.");
+            } else {
+                updateStatus("Itt nincs lerombolható út.");
+            }
+            return;
+        }
+
+        if (tile.getType() == TileType.BUILDING) {
+            var b = map.demolishBuilding(tileX, tileY);
+            if (b != null) {
+                int refund = b.getCost() / 2;
+                player.addMoney(refund);
+                mapRenderer.repaint();
+                updateStatus("Épület lerombolva: " + b.getName() + " (" + tileX + ", " + tileY + "). Visszatérítés: " + refund + "$.");
+            } else {
+                updateStatus("Itt nincs lerombolható épület.");
+            }
+            return;
+        }
+
+        if (tile.getType() == TileType.INDUSTRY) {
+            var ind = map.demolishIndustryAt(tileX, tileY);
+            if (ind != null) {
+                int refund = INDUSTRY_COST / 2;
+                player.addMoney(refund);
+                mapRenderer.repaint();
+                updateStatus("Industry lerombolva: " + ind.getName() + " (" + ind.getOriginX() + ", " + ind.getOriginY() + ") [" + ind.getIndustryType() + "]. Visszatérítés: " + refund + "$.");
+            } else {
+                updateStatus("Itt nincs lerombolható industry.");
+            }
+            return;
+        }
+
+        updateStatus("Itt nincs lerombolható út/épület/industry.");
     }
 
     private void handleBuyVehicleClick(int screenX, int screenY) {
