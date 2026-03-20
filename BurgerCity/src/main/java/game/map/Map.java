@@ -1,8 +1,11 @@
 package game.map;
 
+import game.building.Building;
+
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
@@ -33,20 +36,6 @@ public class Map {
         addCity(new City("Wheat Valley", 5, 28, 7, 6));        // Középméretű város lent balra
         addCity(new City("Factory District", 40, 30, 5, 5));   // Ipari város jobb alsó sarokban
         addCity(new City("Green Hills", 20, 15, 6, 5));        // Középső város
-
-        // Ipari létesítmények
-        // Supply chain:
-        // FARM(WHEAT) -> BAKERY(BREAD)
-        // RANCH(MEAT) -> PATTY_PLANT(MEAT_PATTY)
-        // BREAD + MEAT_PATTY -> BURGER_FACTORY(HAMBURGER)
-        addIndustry(new Industry("Green Farm", IndustryType.FARM, 2, 15, 5, 4));
-        addIndustry(new Industry("Wheat Fields", IndustryType.FARM, 15, 5, 6, 3));
-        addIndustry(new Industry("Valley Farm", IndustryType.FARM, 12, 32, 5, 5));
-        addIndustry(new Industry("North Ranch", IndustryType.RANCH, 30, 15, 4, 4));
-
-        addIndustry(new Industry("Food Plant", IndustryType.BAKERY, 15, 25, 4, 3));
-        addIndustry(new Industry("Meat Processing", IndustryType.PATTY_PLANT, 35, 20, 5, 4));
-        addIndustry(new Industry("Burger Factory", IndustryType.BURGER_FACTORY, 25, 25, 4, 5));
     }
 
     private void initGrass() {
@@ -81,6 +70,43 @@ public class Map {
                 }
             }
         }
+    }
+
+    /**
+     * Player-placed industry placement.
+     * Industries occupy a 2x2 area and are only allowed on unoccupied GRASS tiles.
+     */
+    public boolean buildIndustry(int originX, int originY, IndustryType type) {
+        if (type == null) return false;
+        if (!inBounds(originX, originY)) return false;
+
+        int w = 2;
+        int h = 2;
+        if (!inBounds(originX + w - 1, originY + h - 1)) return false;
+
+        if (overlapsAny(originX, originY, w, h)) return false;
+
+        // Enforce GRASS base terrain for the whole footprint.
+        for (int x = originX; x < originX + w; x++) {
+            for (int y = originY; y < originY + h; y++) {
+                Tile t = getTile(x, y);
+                if (t == null) return false;
+                if (t.getType() != TileType.GRASS) return false;
+                if (t.isOccupied()) return false;
+            }
+        }
+
+        String name = switch (type) {
+            case FARM -> "Farm";
+            case RANCH -> "Ranch";
+            case BAKERY -> "Bakery";
+            case PATTY_PLANT -> "Patty Plant";
+            case BURGER_FACTORY -> "Burger Factory";
+            case FACTORY -> "Factory";
+        };
+
+        addIndustry(new Industry(name, type, originX, originY, w, h));
+        return true;
     }
 
     private boolean overlapsAny(int ox, int oy, int w, int h) {
@@ -120,6 +146,92 @@ public class Map {
     }
 
     public void updateForests() {}
+
+    /**
+     * Player-built building placement.
+     * Only allowed on unoccupied GRASS tiles.
+     */
+    public boolean buildBuilding(int x, int y, Building building) {
+        if (building == null) return false;
+        if (!inBounds(x, y)) return false;
+
+        Tile tile = getTile(x, y);
+        if (tile == null) return false;
+
+        if (tile.getType() != TileType.GRASS || tile.isOccupied()) return false;
+
+        tile.setType(TileType.BUILDING);
+        tile.setWalkable(false);
+        tile.setOccupied(true);
+        tile.setPlacedBuilding(building);
+        return true;
+    }
+
+    /**
+     * Demolishes a player-built building tile and returns the building if any.
+     */
+    public Building demolishBuilding(int x, int y) {
+        if (!inBounds(x, y)) return null;
+        Tile tile = getTile(x, y);
+        if (tile == null) return null;
+
+        if (tile.getType() != TileType.BUILDING) return null;
+        Building b = tile.getPlacedBuilding();
+        if (b == null) return null;
+
+        tile.setPlacedBuilding(null);
+        tile.setType(TileType.GRASS);
+        tile.setWalkable(true);
+        tile.setOccupied(false);
+        return b;
+    }
+
+    /**
+     * Demolishes a road tile (no refund handled here).
+     */
+    public boolean demolishRoad(int x, int y) {
+        if (!inBounds(x, y)) return false;
+        Tile tile = getTile(x, y);
+        if (tile == null) return false;
+        if (tile.getType() != TileType.ROAD) return false;
+
+        tile.setType(TileType.GRASS);
+        tile.setWalkable(true);
+        tile.setOccupied(false);
+        return true;
+    }
+
+    /**
+     * Demolishes an industry by clicking any tile inside its footprint.
+     * Returns the removed industry, or null if there is none.
+     */
+    public Industry demolishIndustryAt(int x, int y) {
+        if (!inBounds(x, y)) return null;
+
+        Iterator<Industry> it = industries.iterator();
+        while (it.hasNext()) {
+            Industry ind = it.next();
+            if (ind == null) continue;
+            if (!ind.occupies(x, y)) continue;
+
+            // Clear footprint
+            for (int tx = ind.getOriginX(); tx < ind.getOriginX() + ind.getWidth(); tx++) {
+                for (int ty = ind.getOriginY(); ty < ind.getOriginY() + ind.getHeight(); ty++) {
+                    if (!inBounds(tx, ty)) continue;
+                    Tile tile = getTile(tx, ty);
+                    if (tile == null) continue;
+                    tile.setType(TileType.GRASS);
+                    tile.setWalkable(true);
+                    tile.setOccupied(false);
+                }
+            }
+
+            it.remove();
+            return ind;
+        }
+
+        return null;
+    }
 
     /**
      * Finds a ROAD-only path between two rectangular areas (e.g., City/Industry footprints).

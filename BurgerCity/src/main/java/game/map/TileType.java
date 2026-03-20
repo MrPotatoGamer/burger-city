@@ -4,5 +4,6 @@ public enum TileType {
     GRASS,
     CITY,
     INDUSTRY,
-    ROAD
+    ROAD,
+    BUILDING
 }
