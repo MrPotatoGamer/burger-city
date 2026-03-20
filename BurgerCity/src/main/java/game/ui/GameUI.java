@@ -39,6 +39,9 @@ public class GameUI extends JFrame {
 
     private record SelectedBuilding(String name, int originX, int originY, int width, int height) {}
 
+    private static final int INITIAL_WINDOW_WIDTH = 1000;
+    private static final int INITIAL_WINDOW_HEIGHT = 720;
+
     public GameUI() {
         setTitle("Mini Transport Tycoon - BurgerCity");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -52,6 +55,7 @@ public class GameUI extends JFrame {
         map.loadPredefined();
 
         mapRenderer = new MapRenderer(map);
+        mapRenderer.setPreferredSize(new Dimension(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT - 120));
         mapRenderer.setVehicles(vehicles);
 
         // Egér kezelése: drag (görgetés) és kattintás
@@ -132,6 +136,7 @@ public class GameUI extends JFrame {
         gameTimer.start();
 
         pack();
+        setSize(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT);
         setLocationRelativeTo(null);
         setResizable(true);
     }
