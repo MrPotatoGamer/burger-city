@@ -36,6 +36,7 @@ public class GameUI extends JFrame {
 
     private GameDashboard dashboard;
     private int dashboardRefreshCounter = 0;
+    private JButton toggleDashboardButton;
 
     private SelectedBuilding startBuilding;
     private SelectedBuilding endBuilding;
@@ -79,6 +80,9 @@ public class GameUI extends JFrame {
                     handleRoadBuild(e.getX(), e.getY());
                 } else if (buyVehicleMode && !wasDragged[0]) {
                     handleBuyVehicleClick(e.getX(), e.getY());
+                } else if (!wasDragged[0]) {
+                    // No mode active — inspect clicked building
+                    handleInspectClick(e.getX(), e.getY());
                 }
                 dragStart[0] = null;
                 wasDragged[0] = false;
@@ -134,6 +138,10 @@ public class GameUI extends JFrame {
         buyVehicleButton = new JButton("Jármű vásárlás");
         buyVehicleButton.addActionListener(e -> toggleBuyVehicleMode());
         topPanel.add(buyVehicleButton);
+
+        toggleDashboardButton = new JButton("Dashboard \u25C0");
+        toggleDashboardButton.addActionListener(e -> toggleDashboard());
+        topPanel.add(toggleDashboardButton);
 
         add(topPanel, BorderLayout.NORTH);
 
@@ -349,6 +357,56 @@ public class GameUI extends JFrame {
             }
         }
         return null;
+    }
+
+    private void handleInspectClick(int screenX, int screenY) {
+        int tileSize = 32;
+        Camera camera = mapRenderer.getCamera();
+        double worldX = camera.screenToWorldX(screenX);
+        double worldY = camera.screenToWorldY(screenY);
+        int tileX = (int) (worldX / tileSize);
+        int tileY = (int) (worldY / tileSize);
+
+        // Check cities
+        for (City c : map.getCities()) {
+            if (c.occupies(tileX, tileY)) {
+                // Make dashboard visible if hidden
+                if (!dashboard.isDashboardVisible()) {
+                    toggleDashboard();
+                }
+                dashboard.inspectCity(c);
+                updateStatus("Inspecting city: " + c.getName());
+                return;
+            }
+        }
+
+        // Check industries
+        for (Industry i : map.getIndustries()) {
+            if (i.occupies(tileX, tileY)) {
+                if (!dashboard.isDashboardVisible()) {
+                    toggleDashboard();
+                }
+                dashboard.inspectIndustry(i);
+                updateStatus("Inspecting industry: " + i.getName());
+                return;
+            }
+        }
+
+        // Clicked on empty space — clear inspection
+        if (dashboard.hasInspection()) {
+            dashboard.clearInspection();
+            updateStatus("Mini Transport Tycoon | BurgerCity");
+        }
+    }
+
+    private void toggleDashboard() {
+        boolean nowVisible = dashboard.toggleVisibility();
+        toggleDashboardButton.setText(nowVisible ? "Dashboard \u25C0" : "Dashboard \u25B6");
+
+        // Resize window to accommodate or reclaim dashboard space
+        int width = nowVisible ? INITIAL_WINDOW_WIDTH + 310 : INITIAL_WINDOW_WIDTH;
+        setSize(width, getHeight());
+        revalidate();
     }
 
     private void tick() {

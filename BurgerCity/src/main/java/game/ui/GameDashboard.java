@@ -29,6 +29,11 @@ public class GameDashboard extends JPanel {
     // === Section panels (rebuilt every refresh) ===
     private JPanel contentPanel;
     private JScrollPane scrollPane;
+    private JLabel header;
+
+    // === Inspection: currently selected city or industry ===
+    private City inspectedCity;
+    private Industry inspectedIndustry;
 
     // Color palette
     private static final Color BG_DARK = new Color(30, 30, 36);
@@ -74,23 +79,89 @@ public class GameDashboard extends JPanel {
     }
 
     /**
+     * Toggle the dashboard content visibility (collapse/expand).
+     * Returns true if dashboard is now visible.
+     */
+    public boolean toggleVisibility() {
+        boolean nowVisible = !scrollPane.isVisible();
+        scrollPane.setVisible(nowVisible);
+        header.setVisible(nowVisible);
+        revalidate();
+        repaint();
+        return nowVisible;
+    }
+
+    public boolean isDashboardVisible() {
+        return scrollPane.isVisible();
+    }
+
+    /**
+     * Show a detailed inspection panel for a specific city.
+     * Pass null to clear the inspection.
+     */
+    public void inspectCity(City city) {
+        this.inspectedCity = city;
+        this.inspectedIndustry = null;
+        refresh();
+    }
+
+    /**
+     * Show a detailed inspection panel for a specific industry.
+     * Pass null to clear the inspection.
+     */
+    public void inspectIndustry(Industry industry) {
+        this.inspectedIndustry = industry;
+        this.inspectedCity = null;
+        refresh();
+    }
+
+    /**
+     * Clear any active inspection and go back to the overview.
+     */
+    public void clearInspection() {
+        this.inspectedCity = null;
+        this.inspectedIndustry = null;
+        refresh();
+    }
+
+    public boolean hasInspection() {
+        return inspectedCity != null || inspectedIndustry != null;
+    }
+
+    /**
      * Called every game tick to refresh all dashboard data.
      */
     public void refresh() {
+        if (!scrollPane.isVisible()) return;
+
         int scrollPos = scrollPane.getVerticalScrollBar().getValue();
 
         contentPanel.removeAll();
-        contentPanel.add(buildFinanceSection());
-        contentPanel.add(Box.createVerticalStrut(6));
-        contentPanel.add(buildVehicleSummarySection());
-        contentPanel.add(Box.createVerticalStrut(6));
-        contentPanel.add(buildCitiesSection());
-        contentPanel.add(Box.createVerticalStrut(6));
-        contentPanel.add(buildIndustriesSection());
-        contentPanel.add(Box.createVerticalStrut(6));
-        contentPanel.add(buildSupplyChainSection());
-        contentPanel.add(Box.createVerticalStrut(6));
-        contentPanel.add(buildPriceTableSection());
+
+        // If inspecting a specific building, show its detail view
+        if (inspectedCity != null) {
+            contentPanel.add(buildInspectionHeader());
+            contentPanel.add(Box.createVerticalStrut(6));
+            contentPanel.add(buildCityDetailSection(inspectedCity));
+        } else if (inspectedIndustry != null) {
+            contentPanel.add(buildInspectionHeader());
+            contentPanel.add(Box.createVerticalStrut(6));
+            contentPanel.add(buildIndustryDetailSection(inspectedIndustry));
+        } else {
+            // Normal overview
+            contentPanel.add(buildFinanceSection());
+            contentPanel.add(Box.createVerticalStrut(6));
+            contentPanel.add(buildVehicleSummarySection());
+            contentPanel.add(Box.createVerticalStrut(6));
+            contentPanel.add(buildCitiesSection());
+            contentPanel.add(Box.createVerticalStrut(6));
+            contentPanel.add(buildIndustriesSection());
+            contentPanel.add(Box.createVerticalStrut(6));
+            contentPanel.add(buildSupplyChainSection());
+            contentPanel.add(Box.createVerticalStrut(6));
+            contentPanel.add(buildPriceTableSection());
+        }
+
         contentPanel.add(Box.createVerticalGlue());
 
         contentPanel.revalidate();
@@ -274,6 +345,272 @@ public class GameDashboard extends JPanel {
         return panel;
     }
 
+    // ─── Inspection Header (back button) ─────────────────────────────
+
+    private JPanel buildInspectionHeader() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(BG_DARK);
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.setBorder(new EmptyBorder(4, 6, 4, 6));
+
+        JButton backBtn = new JButton("\u2190 Back to Overview");
+        backBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+        backBtn.setForeground(ACCENT_BLUE);
+        backBtn.setBackground(BG_SECTION);
+        backBtn.setFocusPainted(false);
+        backBtn.setBorderPainted(true);
+        backBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        backBtn.addActionListener(e -> clearInspection());
+
+        panel.add(backBtn, BorderLayout.WEST);
+        return panel;
+    }
+
+    // ─── City Detail View ────────────────────────────────────────────
+
+    private JPanel buildCityDetailSection(City city) {
+        JPanel panel = createSection("\uD83C\uDFD9 " + city.getName());
+
+        // General info
+        addRow(panel, "Population:", formatNumber(city.getPopulation()), ACCENT_BLUE);
+        addRow(panel, "Location:", "(" + city.getOriginX() + ", " + city.getOriginY() + ")", TEXT_SECONDARY);
+        addRow(panel, "Size:", city.getWidth() + " x " + city.getHeight() + " tiles", TEXT_SECONDARY);
+
+        panel.add(Box.createVerticalStrut(6));
+        addSectionDivider(panel, "\uD83D\uDE8D Passengers");
+
+        int passengersWaiting = city.getWaiting().get(ResourceType.PASSENGERS);
+        Color waitColor = passengersWaiting > 20 ? ACCENT_RED
+                : passengersWaiting > 5 ? ACCENT_ORANGE : ACCENT_GREEN;
+        addRow(panel, "Waiting:", String.valueOf(passengersWaiting), waitColor);
+        addRow(panel, "Generation rate:", String.format("%.3f /s", city.getPassengersPerSecond()), TEXT_SECONDARY);
+
+        if (passengersWaiting > 20) {
+            addInfoRow(panel, "  \u26A0 Passengers piling up! Add more buses.", ACCENT_RED);
+        } else if (passengersWaiting == 0) {
+            addInfoRow(panel, "  \u2713 No passengers waiting.", ACCENT_GREEN);
+        }
+
+        // Revenue info for passengers
+        int passengerRevenue = ResourcePrices.revenuePerUnit(ResourceType.PASSENGERS);
+        addRow(panel, "Passenger revenue:", passengerRevenue + "$ /unit", ACCENT_GREEN);
+
+        panel.add(Box.createVerticalStrut(6));
+        addSectionDivider(panel, "\uD83D\uDCE6 Goods Demand");
+
+        // Demand backlog
+        var backlog = city.getDemandBacklog().asUnmodifiableMap();
+        if (backlog.isEmpty()) {
+            addInfoRow(panel, "  No pending demand yet.", TEXT_SECONDARY);
+        } else {
+            for (var entry : backlog.entrySet()) {
+                int amount = entry.getValue();
+                Color demandColor = amount > 10 ? ACCENT_RED
+                        : amount > 3 ? ACCENT_ORANGE : ACCENT_GREEN;
+                addRow(panel, "  " + entry.getKey().getDisplayName() + " backlog:",
+                        String.valueOf(amount), demandColor);
+                int rev = ResourcePrices.revenuePerUnit(entry.getKey());
+                addRow(panel, "    Revenue if delivered:", amount * rev + "$ (total)", ACCENT_GREEN);
+            }
+        }
+
+        // Goods demand rates
+        var goodsRates = city.getGoodsPerSecond();
+        for (var entry : goodsRates.entrySet()) {
+            addRow(panel, "  " + entry.getKey().getDisplayName() + " demand rate:",
+                    String.format("%.3f /s", entry.getValue()), TEXT_SECONDARY);
+        }
+
+        panel.add(Box.createVerticalStrut(6));
+        addSectionDivider(panel, "\uD83D\uDE9A Vehicles Serving This City");
+
+        int busesServing = 0;
+        int trucksServing = 0;
+        for (Vehicle v : vehicles) {
+            if (!v.hasPath()) continue;
+            // Check if vehicle's path endpoints are adjacent to this city
+            if (isVehicleServingCity(v, city)) {
+                if (v instanceof Bus) busesServing++;
+                else if (v instanceof Truck) trucksServing++;
+            }
+        }
+        if (busesServing == 0 && trucksServing == 0) {
+            addInfoRow(panel, "  No vehicles assigned to this city.", ACCENT_ORANGE);
+        } else {
+            addRow(panel, "  Buses:", String.valueOf(busesServing), ACCENT_BLUE);
+            addRow(panel, "  Trucks:", String.valueOf(trucksServing), ACCENT_ORANGE);
+        }
+
+        panel.add(Box.createVerticalStrut(6));
+        addSectionDivider(panel, "\uD83D\uDCA1 Tips");
+        addInfoRow(panel, "  \u2022 Send buses between cities for passenger $", TEXT_SECONDARY);
+        addInfoRow(panel, "  \u2022 Deliver hamburgers here for " +
+                ResourcePrices.revenuePerUnit(ResourceType.HAMBURGER) + "$/unit", TEXT_SECONDARY);
+
+        return panel;
+    }
+
+    // ─── Industry Detail View ────────────────────────────────────────
+
+    private JPanel buildIndustryDetailSection(Industry ind) {
+        JPanel panel = createSection("\uD83C\uDFED " + ind.getName());
+
+        // General info
+        String prodPercent = String.format("%.0f%%", ind.getProductivity() * 100);
+        Color prodColor = ind.getProductivity() >= 0.9 ? ACCENT_GREEN
+                : ind.getProductivity() >= 0.6 ? ACCENT_ORANGE : ACCENT_RED;
+
+        addRow(panel, "Type:", ind.getIndustryType().name(), ACCENT_BLUE);
+        addRow(panel, "Location:", "(" + ind.getOriginX() + ", " + ind.getOriginY() + ")", TEXT_SECONDARY);
+        addRow(panel, "Size:", ind.getWidth() + " x " + ind.getHeight() + " tiles", TEXT_SECONDARY);
+        addRow(panel, "Productivity:", prodPercent, prodColor);
+        addRow(panel, "Base rate:", String.format("%.2f units/s", ind.getProfile().getBaseUnitsPerSecond()), TEXT_SECONDARY);
+        addRow(panel, "Effective rate:", String.format("%.2f units/s",
+                ind.getProfile().getBaseUnitsPerSecond() * ind.getProductivity()), prodColor);
+
+        panel.add(Box.createVerticalStrut(6));
+        addSectionDivider(panel, "\uD83D\uDCE5 Inputs (per production unit)");
+
+        var inputs = ind.getProfile().getInputsPerUnit();
+        if (inputs.isEmpty()) {
+            addInfoRow(panel, "  None — this is a raw resource producer!", ACCENT_GREEN);
+        } else {
+            for (var e : inputs.entrySet()) {
+                int stored = ind.getStorage().get(e.getKey());
+                Color storedColor = stored >= 10 ? ACCENT_GREEN
+                        : stored > 0 ? ACCENT_ORANGE : ACCENT_RED;
+                addRow(panel, "  " + e.getKey().getDisplayName() + " needed:", String.valueOf(e.getValue()), TEXT_PRIMARY);
+                addRow(panel, "    In storage:", String.valueOf(stored), storedColor);
+
+                if (stored == 0) {
+                    addInfoRow(panel, "    \u26A0 Out of stock! Production halted.", ACCENT_RED);
+                } else {
+                    int unitsAvailable = stored / e.getValue();
+                    addRow(panel, "    Can produce:", unitsAvailable + " units", TEXT_SECONDARY);
+                }
+            }
+        }
+
+        panel.add(Box.createVerticalStrut(6));
+        addSectionDivider(panel, "\uD83D\uDCE4 Outputs (per production unit)");
+
+        var outputs = ind.getProfile().getOutputsPerUnit();
+        if (outputs.isEmpty()) {
+            addInfoRow(panel, "  None — this industry has no outputs.", TEXT_SECONDARY);
+        } else {
+            for (var e : outputs.entrySet()) {
+                int stored = ind.getStorage().get(e.getKey());
+                Color storedColor = stored > 0 ? ACCENT_GREEN : TEXT_SECONDARY;
+                addRow(panel, "  " + e.getKey().getDisplayName() + " produced:", String.valueOf(e.getValue()), TEXT_PRIMARY);
+                addRow(panel, "    In storage:", String.valueOf(stored), storedColor);
+                int rev = ResourcePrices.revenuePerUnit(e.getKey());
+                addRow(panel, "    Value per unit:", rev + "$", ACCENT_GREEN);
+                if (stored > 0) {
+                    addRow(panel, "    Total value in stock:", stored * rev + "$", ACCENT_GOLD);
+                }
+            }
+        }
+
+        panel.add(Box.createVerticalStrut(6));
+        addSectionDivider(panel, "\uD83D\uDE9A Vehicles Serving This Industry");
+
+        int trucksServing = 0;
+        for (Vehicle v : vehicles) {
+            if (!v.hasPath()) continue;
+            if (v instanceof Truck && isVehicleServingIndustry(v, ind)) {
+                trucksServing++;
+            }
+        }
+        if (trucksServing == 0) {
+            addInfoRow(panel, "  No trucks assigned to this industry.", ACCENT_ORANGE);
+        } else {
+            addRow(panel, "  Trucks:", String.valueOf(trucksServing), ACCENT_ORANGE);
+        }
+
+        panel.add(Box.createVerticalStrut(6));
+        addSectionDivider(panel, "\uD83D\uDCA1 Tips");
+
+        switch (ind.getIndustryType()) {
+            case FARM -> {
+                addInfoRow(panel, "  \u2022 Produces Wheat — deliver to a Bakery.", TEXT_SECONDARY);
+            }
+            case RANCH -> {
+                addInfoRow(panel, "  \u2022 Produces Meat — deliver to a Patty Plant.", TEXT_SECONDARY);
+            }
+            case BAKERY -> {
+                addInfoRow(panel, "  \u2022 Needs Wheat, produces Bread.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Deliver Bread to a Burger Factory.", TEXT_SECONDARY);
+            }
+            case PATTY_PLANT -> {
+                addInfoRow(panel, "  \u2022 Needs Meat, produces Meat Patties.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Deliver Patties to a Burger Factory.", TEXT_SECONDARY);
+            }
+            case BURGER_FACTORY -> {
+                addInfoRow(panel, "  \u2022 Needs Bread + Meat Patties.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Produces Hamburgers — deliver to cities!", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Hamburgers = highest revenue ("
+                        + ResourcePrices.revenuePerUnit(ResourceType.HAMBURGER) + "$/unit).", ACCENT_GOLD);
+            }
+            case FACTORY -> {
+                addInfoRow(panel, "  \u2022 Generic factory — no production set up.", TEXT_SECONDARY);
+            }
+        }
+
+        return panel;
+    }
+
+    // ─── Vehicle-Building proximity checks ───────────────────────────
+
+    private boolean isVehicleServingCity(Vehicle v, City city) {
+        return isVehicleEndpointAdjacentTo(v, city.getOriginX(), city.getOriginY(),
+                city.getWidth(), city.getHeight());
+    }
+
+    private boolean isVehicleServingIndustry(Vehicle v, Industry ind) {
+        return isVehicleEndpointAdjacentTo(v, ind.getOriginX(), ind.getOriginY(),
+                ind.getWidth(), ind.getHeight());
+    }
+
+    private boolean isVehicleEndpointAdjacentTo(Vehicle v, int ox, int oy, int w, int h) {
+        if (v == null || !v.hasPath()) return false;
+        try {
+            var pathField = Vehicle.class.getDeclaredField("pathTiles");
+            pathField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            List<int[]> path = (List<int[]>) pathField.get(v);
+            if (path == null || path.size() < 2) return false;
+
+            int[] start = path.get(0);
+            int[] end = path.get(path.size() - 1);
+
+            return isTileAdjacentToArea(start[0], start[1], ox, oy, w, h)
+                    || isTileAdjacentToArea(end[0], end[1], ox, oy, w, h);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isTileAdjacentToArea(int tx, int ty, int ox, int oy, int w, int h) {
+        // Check if tile (tx,ty) is directly adjacent to the rectangle [ox,oy,w,h]
+        for (int x = ox; x < ox + w; x++) {
+            if ((tx == x && ty == oy - 1) || (tx == x && ty == oy + h)) return true;
+        }
+        for (int y = oy; y < oy + h; y++) {
+            if ((tx == ox - 1 && ty == y) || (tx == ox + w && ty == y)) return true;
+        }
+        return false;
+    }
+
+    private void addSectionDivider(JPanel parent, String label) {
+        JLabel lbl = new JLabel(label);
+        lbl.setFont(new Font("SansSerif", Font.BOLD, 11));
+        lbl.setForeground(ACCENT_GOLD);
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lbl.setBorder(new EmptyBorder(2, 0, 2, 0));
+        parent.add(lbl);
+    }
+
     // ─── Price Table ────────────────────────────────────────────────
 
     private JPanel buildPriceTableSection() {
@@ -284,8 +621,11 @@ public class GameDashboard extends JPanel {
             addRow(panel, "  " + type.getDisplayName() + ":", price + "$ /unit", ACCENT_GREEN);
         }
 
+
         return panel;
     }
+
+
 
     // ─── Helpers ────────────────────────────────────────────────────
 
