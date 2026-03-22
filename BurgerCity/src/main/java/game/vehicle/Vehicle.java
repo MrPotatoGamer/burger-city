@@ -179,11 +179,34 @@ public class Vehicle {
         City adjacentCity = findAdjacentCity(map, currentTileX, currentTileY);
         Industry adjacentIndustry = findAdjacentIndustry(map, currentTileX, currentTileY);
 
-        // Prioritize a city if both are adjacent (rare, but can happen in tight maps).
-        if (adjacentCity != null) {
+        int otherIdx = (idx == 0) ? (pathTiles.size() - 1) : 0;
+        int[] otherTile = pathTiles.get(otherIdx);
+        City otherCity = findAdjacentCity(map, otherTile[0], otherTile[1]);
+        Industry otherIndustry = findAdjacentIndustry(map, otherTile[0], otherTile[1]);
+
+        // Better priority rules:
+        // - If empty: prefer industry pickup (bus will skip due to canCarry checks).
+        // - If carrying passengers: prefer city dropoff.
+        // - If carrying goods: prefer industry if it consumes it, otherwise city if it demands it.
+        if (currentCargo == null || currentCargo.isEmpty()) {
+            if (adjacentIndustry != null) handleIndustryInteraction(adjacentIndustry, player, otherCity, otherIndustry);
+            if (adjacentCity != null) handleCityInteraction(adjacentCity, player);
+            return;
+        }
+
+        ResourceType cargoType = currentCargo.getType();
+        if (cargoType == ResourceType.PASSENGERS) {
+            if (adjacentCity != null) handleCityInteraction(adjacentCity, player);
+            return;
+        }
+
+        if (adjacentIndustry != null && adjacentIndustry.consumes(cargoType)) {
+            handleIndustryInteraction(adjacentIndustry, player, otherCity, otherIndustry);
+        } else if (adjacentCity != null) {
             handleCityInteraction(adjacentCity, player);
         } else if (adjacentIndustry != null) {
-            handleIndustryInteraction(adjacentIndustry, player);
+            // Can't unload here, but still allow potential logic in the future.
+            handleIndustryInteraction(adjacentIndustry, player, otherCity, otherIndustry);
         }
     }
 
@@ -328,15 +351,16 @@ public class Vehicle {
         if (currentCargo.isEmpty()) currentCargo = null;
     }
 
-    private void handleIndustryInteraction(Industry industry, Player player) {
+    private void handleIndustryInteraction(Industry industry, Player player, City otherEndpointCity, Industry otherEndpointIndustry) {
         if (industry == null) return;
 
         if (currentCargo == null || currentCargo.isEmpty()) {
-            // Load one of the industry's produced goods.
+            // Load only produced goods that can be delivered to the other endpoint.
             for (ResourceType type : industry.getProfile().getOutputsPerUnit().keySet()) {
                 if (type == null) continue;
                 if (type == ResourceType.PASSENGERS) continue;
                 if (!canCarry(type)) continue;
+                if (!canDeliverToOtherEndpoint(type, otherEndpointCity, otherEndpointIndustry)) continue;
 
                 int taken = industry.takeFromStorage(type, Math.max(0, capacity));
                 if (taken > 0) {
@@ -358,6 +382,19 @@ public class Vehicle {
         int revenue = amount * ResourcePrices.revenuePerUnit(type);
         if (revenue != 0) player.addMoney(revenue);
         currentCargo = null;
+    }
+
+    private static boolean canDeliverToOtherEndpoint(ResourceType type, City otherCity, Industry otherIndustry) {
+        if (type == null) return false;
+
+        if (otherIndustry != null && otherIndustry.consumes(type)) return true;
+
+        if (otherCity != null) {
+            if (type == ResourceType.PASSENGERS) return true;
+            return otherCity.getDemandBacklog().get(type) > 0;
+        }
+
+        return false;
     }
 
     private static City findAdjacentCity(Map map, int roadX, int roadY) {
