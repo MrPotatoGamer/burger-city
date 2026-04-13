@@ -1,9 +1,6 @@
 package game.core;
 
-/**
- * Manages game time with multiple speed settings: pause, normal (1x), fast (2x), very fast (4x).
- * Tracks elapsed game time in ticks.
- */
+//manages time with multiple speed settings: pause, normal (1x), fast (2x), very fast (4x).
 public class TimeManager {
 
     public enum TimeSpeed {
@@ -39,11 +36,7 @@ public class TimeManager {
         this.accumulatedGameTime = 0.0;
     }
 
-    /**
-     * Updates the game time based on real delta time and current speed multiplier.
-     * @param realDeltaSeconds Real time elapsed since last update
-     * @return Game time delta (adjusted by speed multiplier)
-     */
+    //Updates the game time based on real delta time and current speed multiplier.
     public double update(double realDeltaSeconds) {
         double gameDelta = realDeltaSeconds * currentSpeed.getMultiplier();
         accumulatedGameTime += gameDelta;
