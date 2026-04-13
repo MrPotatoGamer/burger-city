@@ -8,7 +8,7 @@ public class TimeManager {
 
     public enum TimeSpeed {
         PAUSED(0.0, "⏸ Szünet"),
-        NORMAL(1.0, "▶ Normál (1x)"),
+        NORMAL(1.0, "▶ Normál"),
         FAST(2.0, "▶▶ Gyors (2x)"),
         VERY_FAST(4.0, "▶▶▶ Nagyon gyors (4x)");
 
