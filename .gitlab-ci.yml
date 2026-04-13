@@ -69,7 +69,8 @@ pages:
   script:
     - cd BurgerCity
     - mvn javadoc:javadoc
-    - cp -r target/site ../public
+    - mkdir -p ../public
+    - cp -r target/site/apidocs/* ../public/
   artifacts:
     paths:
       - public
