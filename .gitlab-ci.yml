@@ -37,28 +37,26 @@ test:
     - mvn clean verify
     - apt-get update -yqq && apt-get install -yqq libxml2-utils
     - |
-      COVERAGE=$(xmllint --xpath "string(//report/counter[@type='LINE']/@covered)" target/site/jacoco/jacoco.xml)
-      MISSED=$(xmllint --xpath "string(//report/counter[@type='LINE']/@missed)" target/site/jacoco/jacoco.xml)
-      TOTAL=$((COVERAGE + MISSED))
-      PERCENT=$((100 * COVERAGE / TOTAL))
-      echo "TOTAL_COVERAGE=$PERCENT%"
+      FILE="target/site/jacoco/jacoco.xml"
+      if [ -f "$FILE" ]; then
+        COVERAGE=$(xmllint --xpath "string(//report/counter[@type='LINE']/@covered)" "$FILE")
+        MISSED=$(xmllint --xpath "string(//report/counter[@type='LINE']/@missed)" "$FILE")
+        TOTAL=$((COVERAGE + MISSED))
+        PERCENT=$((100 * COVERAGE / TOTAL))
+        echo "TOTAL_COVERAGE=$PERCENT%"
+      else
+        echo "TOTAL_COVERAGE=0%"
+      fi
   artifacts:
     paths:
       - BurgerCity/target/surefire-reports/
       - BurgerCity/target/site/jacoco/
     reports:
-      # Publish unit test results to GitLab UI
-      # https://docs.gitlab.com/ci/testing/unit_test_reports/
-      junit: target/surefire-reports/*.xml
-      # Test coverage visualization on GitLab UI
-      # https://docs.gitlab.com/ci/testing/code_coverage/
+      junit: BurgerCity/target/surefire-reports/*.xml
       coverage_report:
         coverage_format: jacoco
-        path: target/site/jacoco/jacoco.xml
-  # Report code coverage for GitLab
-  # https://docs.gitlab.com/ci/testing/code_coverage/
+        path: BurgerCity/target/site/jacoco/jacoco.xml
   coverage: '/TOTAL_COVERAGE=(\d+)%/'
-
 # Documentation
 pages:
   stage: deploy
