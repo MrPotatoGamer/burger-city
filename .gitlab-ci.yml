@@ -57,7 +57,13 @@ test:
         coverage_format: jacoco
         path: BurgerCity/target/site/jacoco/jacoco.xml
   coverage: '/TOTAL_COVERAGE=(\d+)%/'
+
+code_quality_java:
+  before_script:
+    - cd BurgerCity
 # Documentation
+
+
 pages:
   stage: deploy
   script:
