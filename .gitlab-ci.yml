@@ -63,8 +63,9 @@ test:
 pages:
   stage: deploy
   script:
+    - cd BurgerCity
     - mvn javadoc:javadoc
-    - cp -r target/site/. public/
+    - cp -r target/site ../public
   artifacts:
     paths:
       - public
