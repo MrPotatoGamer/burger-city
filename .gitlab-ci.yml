@@ -68,9 +68,9 @@ pages:
   stage: deploy
   script:
     - cd BurgerCity
-    - mvn javadoc:javadoc
+    - mvn clean site
     - mkdir -p ../public
-    - cp -r target/site/apidocs/* ../public/
+    - cp -r target/site/* ../public/
   artifacts:
     paths:
       - public
