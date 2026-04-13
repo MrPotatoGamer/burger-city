@@ -5,6 +5,7 @@ import game.building.Road;
 import game.building.Stop;
 import game.building.TrafficLight;
 import game.core.Player;
+import game.core.TimeManager;
 import game.map.City;
 import game.map.Industry;
 import game.map.IndustryType;
@@ -63,6 +64,9 @@ public class GameUI extends JFrame {
     private int dashboardRefreshCounter = 0;
     private JButton toggleDashboardButton;
 
+    private TimeManager timeManager;
+    private TimeControlPanel timeControlPanel;
+
     private SelectedBuilding startBuilding;
     private SelectedBuilding endBuilding;
 
@@ -75,6 +79,9 @@ public class GameUI extends JFrame {
         setTitle("Mini Transport Tycoon - BurgerCity");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
+
+        // Time manager initialization
+        timeManager = new TimeManager();
 
         // Játékos létrehozása kezdőpénzzel
         player = new Player(10000);
@@ -158,6 +165,14 @@ public class GameUI extends JFrame {
         dashboard = new GameDashboard(player, map, vehicles);
         add(dashboard, BorderLayout.EAST);
 
+        // Wrapper for top panels (time control + buttons)
+        JPanel topWrapper = new JPanel();
+        topWrapper.setLayout(new BorderLayout());
+
+        // Time control panel
+        timeControlPanel = new TimeControlPanel(timeManager);
+        topWrapper.add(timeControlPanel, BorderLayout.NORTH);
+
         // Felső panel gombokkal
         JPanel topPanel = new JPanel();
         topPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
@@ -186,7 +201,8 @@ public class GameUI extends JFrame {
         toggleDashboardButton.addActionListener(e -> toggleDashboard());
         topPanel.add(toggleDashboardButton);
 
-        add(topPanel, BorderLayout.NORTH);
+        topWrapper.add(topPanel, BorderLayout.SOUTH);
+        add(topWrapper, BorderLayout.NORTH);
 
         // Állapotsáv
         lastStatusMessage = "Mini Transport Tycoon | BurgerCity";
@@ -815,15 +831,21 @@ public class GameUI extends JFrame {
 
     private void tick() {
         long now = System.nanoTime();
-        double deltaSeconds = (now - lastTickNanos) / 1_000_000_000.0;
+        double realDeltaSeconds = (now - lastTickNanos) / 1_000_000_000.0;
         lastTickNanos = now;
 
-        map.updateEconomy(deltaSeconds);
+        // Update time manager and get game-adjusted delta time
+        double gameDeltaSeconds = timeManager.update(realDeltaSeconds);
 
-        for (Vehicle v : vehicles) {
-            if (v == null) continue;
-            v.update(map, deltaSeconds);
-            v.processArrivalEconomy(map, player);
+        // Only update game logic if not paused (gameDeltaSeconds will be 0 when paused)
+        if (!timeManager.isPaused()) {
+            map.updateEconomy(gameDeltaSeconds);
+
+            for (Vehicle v : vehicles) {
+                if (v == null) continue;
+                v.update(map, gameDeltaSeconds);
+                v.processArrivalEconomy(map, player);
+            }
         }
 
         // Refresh dashboard every ~30 frames (~0.5 seconds) to keep it responsive but efficient
@@ -832,6 +854,9 @@ public class GameUI extends JFrame {
             dashboardRefreshCounter = 0;
             dashboard.refresh();
         }
+
+        // Always refresh time control panel
+        timeControlPanel.refresh();
 
         mapRenderer.repaint();
 
