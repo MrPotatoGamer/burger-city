@@ -27,6 +27,7 @@ public class MapRenderer extends JPanel {
     private List<Vehicle> vehicles = List.of();
     private BufferedImage grassTexture;
     private BufferedImage grassLayerCache;
+    private BufferedImage cityTexture;
 
     public MapRenderer(game.map.Map map) {
         this.map = map;
@@ -60,6 +61,20 @@ public class MapRenderer extends JPanel {
             System.err.println("Nem sikerült betölteni a fű textúrát: " + e.getMessage());
             grassTexture = null;
             grassLayerCache = null;
+        }
+
+        // City textúra betöltése és előre skálázása
+        try {
+            BufferedImage originalCity = ImageIO.read(new File("src/main/java/game/assets/city.png"));
+            // Előre skálázzuk TILE_SIZE-ra
+            cityTexture = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = cityTexture.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(originalCity, 0, 0, TILE_SIZE, TILE_SIZE, null);
+            g.dispose();
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni a város textúrát: " + e.getMessage());
+            cityTexture = null;
         }
 
         setBackground(Color.BLACK);
@@ -134,6 +149,8 @@ public class MapRenderer extends JPanel {
                     drawRoad(g2, x, y);
                 } else if (tile.getType() == TileType.GRASS) {
                     // Fű tile-ok át lesznek ugorva, mert egy cache réteget rajzolunk
+                } else if (tile.getType() == TileType.CITY) {
+                    // City tile-ok külön renderelve lesznek (az egész város egyben)
                 } else {
                     // Normál mezők rajzolása
                     Color color = tileColors.getOrDefault(tile.getType(), Color.DARK_GRAY);
@@ -153,16 +170,11 @@ public class MapRenderer extends JPanel {
             }
         }
 
-        // Városok neve
+        // Városok renderelése (textúra + név egyben)
         int cityFontSize = Math.max(8, (int) (9 * zoom));
         g2.setFont(new Font("Arial", Font.BOLD, cityFontSize));
         for (City city : map.getCities()) {
-            int px = city.getOriginX() * TILE_SIZE + 2;
-            int py = city.getOriginY() * TILE_SIZE + 11;
-            g2.setColor(Color.DARK_GRAY);
-            g2.drawString(city.getName(), px + 1, py + 1);
-            g2.setColor(Color.WHITE);
-            g2.drawString(city.getName(), px, py);
+            drawCity(g2, city);
         }
 
         // Ipari létesítmények neve és típusa
@@ -359,5 +371,38 @@ public class MapRenderer extends JPanel {
         }
 
         g.dispose();
+    }
+
+    private void drawCity(Graphics2D g2, City city) {
+        int px = city.getOriginX() * TILE_SIZE;
+        int py = city.getOriginY() * TILE_SIZE;
+        int width = city.getWidth() * TILE_SIZE;
+        int height = city.getHeight() * TILE_SIZE;
+
+        if (cityTexture != null) {
+            // City textúra skálázva az egész város méretére
+            g2.drawImage(cityTexture, px, py, width, height, null);
+
+            // Átmeneti szegély hogy jobban elkülönüljön
+            g2.setColor(new Color(50, 50, 50, 120));
+            g2.setStroke(new BasicStroke(2.0f));
+            g2.drawRect(px, py, width - 1, height - 1);
+            g2.setStroke(new BasicStroke(1.0f));
+        } else {
+            // Fallback: szürke terület
+            Color color = tileColors.get(TileType.CITY);
+            g2.setColor(color);
+            g2.fillRect(px, py, width, height);
+            g2.setColor(Color.BLACK);
+            g2.drawRect(px, py, width - 1, height - 1);
+        }
+
+        // Város neve
+        int nameX = px + 2;
+        int nameY = py + 11;
+        g2.setColor(Color.DARK_GRAY);
+        g2.drawString(city.getName(), nameX + 1, nameY + 1);
+        g2.setColor(Color.WHITE);
+        g2.drawString(city.getName(), nameX, nameY);
     }
 }
