@@ -26,6 +26,7 @@ public class MapRenderer extends JPanel {
     private Camera camera;
     private List<Vehicle> vehicles = List.of();
     private BufferedImage grassTexture;
+    private BufferedImage grassLayerCache;
 
     public MapRenderer(game.map.Map map) {
         this.map = map;
@@ -43,12 +44,22 @@ public class MapRenderer extends JPanel {
         industryColors.put(IndustryType.BURGER_FACTORY, new Color(180, 100, 100));
         industryColors.put(IndustryType.FACTORY,        new Color(180, 100, 100));
 
-        // Fű textúra betöltése
+        // Fű textúra betöltése és előre skálázása
         try {
-            grassTexture = ImageIO.read(new File("src/main/java/game/assets/grass.png"));
+            BufferedImage originalGrass = ImageIO.read(new File("src/main/java/game/assets/grass.png"));
+            // Előre skálázzuk a textúrát TILE_SIZE-ra
+            grassTexture = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = grassTexture.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(originalGrass, 0, 0, TILE_SIZE, TILE_SIZE, null);
+            g.dispose();
+
+            // Cache: előre rendereljük az összes fű tile-t egy nagy képbe
+            buildGrassLayerCache();
         } catch (IOException e) {
             System.err.println("Nem sikerült betölteni a fű textúrát: " + e.getMessage());
             grassTexture = null;
+            grassLayerCache = null;
         }
 
         setBackground(Color.BLACK);
@@ -82,11 +93,12 @@ public class MapRenderer extends JPanel {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
 
-        // Rendering quality beállítások
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        // Rendering beállítások - teljesítmény optimalizálva
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g2.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_SPEED);
 
         double zoom = camera.getZoom();
         double cameraX = camera.getX();
@@ -106,6 +118,11 @@ public class MapRenderer extends JPanel {
         int endX = Math.min(map.getWidth(), (int) ((scaledCameraX + getWidth() / zoom) / TILE_SIZE) + 2);
         int endY = Math.min(map.getHeight(), (int) ((scaledCameraY + getHeight() / zoom) / TILE_SIZE) + 2);
 
+        // Fű réteg cache rajzolása (1 nagy kép az összes fű helyett)
+        if (grassLayerCache != null) {
+            g2.drawImage(grassLayerCache, 0, 0, null);
+        }
+
         // Mezők kirajzolása
         for (int x = startX; x < endX; x++) {
             for (int y = startY; y < endY; y++) {
@@ -116,15 +133,7 @@ public class MapRenderer extends JPanel {
                     // Speciális útrajzolás
                     drawRoad(g2, x, y);
                 } else if (tile.getType() == TileType.GRASS) {
-                    // Fű textúra rajzolása
-                    if (grassTexture != null) {
-                        g2.drawImage(grassTexture, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, null);
-                    } else {
-                        // Fallback ha nincs textúra
-                        Color color = tileColors.get(TileType.GRASS);
-                        g2.setColor(color);
-                        g2.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                    }
+                    // Fű tile-ok át lesznek ugorva, mert egy cache réteget rajzolunk
                 } else {
                     // Normál mezők rajzolása
                     Color color = tileColors.getOrDefault(tile.getType(), Color.DARK_GRAY);
@@ -317,5 +326,38 @@ public class MapRenderer extends JPanel {
         Tile tile = map.getTile(x, y);
         if (tile == null) return false;
         return tile.getType() == TileType.ROAD || tile.getType() == TileType.BUILDING;
+    }
+
+    private void buildGrassLayerCache() {
+        if (grassTexture == null) {
+            grassLayerCache = null;
+            return;
+        }
+
+        int width = map.getWidth() * TILE_SIZE;
+        int height = map.getHeight() * TILE_SIZE;
+
+        grassLayerCache = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = grassLayerCache.createGraphics();
+
+        // Gyors rendering beállítások
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
+
+        // Rendereljük az összes fű tile-t egyszer
+        for (int x = 0; x < map.getWidth(); x++) {
+            for (int y = 0; y < map.getHeight(); y++) {
+                Tile tile = map.getTile(x, y);
+                if (tile != null && tile.getType() == TileType.GRASS) {
+                    g.drawImage(grassTexture, x * TILE_SIZE, y * TILE_SIZE, null);
+                } else {
+                    // Nem-fű tile-ok: átlátszó vagy alapszín
+                    g.setColor(Color.BLACK);
+                    g.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                }
+            }
+        }
+
+        g.dispose();
     }
 }
