@@ -200,6 +200,8 @@ public class MapRenderer extends JPanel {
         int roadH = TILE_SIZE;
 
         // Határozzuk meg az út irányát és rajzoljuk meg
+        int connectionCount = (north ? 1 : 0) + (south ? 1 : 0) + (east ? 1 : 0) + (west ? 1 : 0);
+        
         if ((north || south) && !(east || west)) {
             // Függőleges út
             roadX = px + margin;
@@ -218,20 +220,45 @@ public class MapRenderer extends JPanel {
             // Középvonal (szaggatott fehér)
             drawDashedLine(g2, roadX, roadY + roadH / 2, roadX + TILE_SIZE, roadY + roadH / 2, 
                           new Color(220, 220, 220), 1);
+        } else if (connectionCount == 2) {
+            // Kanyar (pontosan 2 kapcsolódás, nem szemben)
+            drawCorner(g2, px, py, margin, roadWidth, north, south, east, west);
         } else {
-            // Kereszteződés, sarok vagy komplex forma
+            // Kereszteződés vagy T-elágazás (3+ kapcsolódás)
             g2.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
             
-            // Kereszteződés vagy T-elágazás jelölése (kisebb fehér négyzet a közepén)
-            int count = (north ? 1 : 0) + (south ? 1 : 0) + (east ? 1 : 0) + (west ? 1 : 0);
-            if (count >= 3) {
-                // Kereszteződés vagy T-elágazás
+            if (connectionCount >= 3) {
+                // Kereszteződés vagy T-elágazás jelölése
                 g2.setColor(new Color(200, 200, 200));
                 int centerSize = 4;
                 g2.fillRect(px + TILE_SIZE / 2 - centerSize / 2, 
                            py + TILE_SIZE / 2 - centerSize / 2, 
                            centerSize, centerSize);
             }
+        }
+    }
+
+    private void drawCorner(Graphics2D g2, int px, int py, int margin, int roadWidth, 
+                           boolean north, boolean south, boolean east, boolean west) {
+        // Kanyar rajzolása - L alakú út két szakaszból
+        g2.setColor(new Color(80, 80, 80));
+        
+        if (north && east) {
+            // Észak-Kelet kanyar (┗ alakú)
+            g2.fillRect(px + margin, py, roadWidth, TILE_SIZE / 2 + margin);  // Függőleges rész
+            g2.fillRect(px + margin, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+        } else if (north && west) {
+            // Észak-Nyugat kanyar (┛ alakú)
+            g2.fillRect(px + margin, py, roadWidth, TILE_SIZE / 2 + margin);  // Függőleges rész
+            g2.fillRect(px, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+        } else if (south && east) {
+            // Dél-Kelet kanyar (┏ alakú)
+            g2.fillRect(px + margin, py + margin, roadWidth, TILE_SIZE - margin);  // Függőleges rész
+            g2.fillRect(px + margin, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+        } else if (south && west) {
+            // Dél-Nyugat kanyar (┓ alakú)
+            g2.fillRect(px + margin, py + margin, roadWidth, TILE_SIZE - margin);  // Függőleges rész
+            g2.fillRect(px, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
         }
     }
 
