@@ -99,18 +99,24 @@ public class MapRenderer extends JPanel {
                 Tile tile = map.getTile(x, y);
                 if (tile == null) continue;
 
-                Color color = tileColors.getOrDefault(tile.getType(), Color.DARK_GRAY);
-                g2.setColor(color);
-                g2.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                g2.setColor(Color.BLACK);
-                g2.drawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-
-                if (tile.getType() == TileType.BUILDING && tile.getPlacedBuilding() != null) {
-                    String label = tile.getPlacedBuilding().getName();
-                    String letter = (label == null || label.isEmpty()) ? "B" : label.substring(0, 1).toUpperCase();
+                if (tile.getType() == TileType.ROAD) {
+                    // Speciális útrajzolás
+                    drawRoad(g2, x, y);
+                } else {
+                    // Normál mezők rajzolása
+                    Color color = tileColors.getOrDefault(tile.getType(), Color.DARK_GRAY);
+                    g2.setColor(color);
+                    g2.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                     g2.setColor(Color.BLACK);
-                    g2.setFont(new Font("Arial", Font.BOLD, 12));
-                    g2.drawString(letter, x * TILE_SIZE + 12, y * TILE_SIZE + 20);
+                    g2.drawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+                    if (tile.getType() == TileType.BUILDING && tile.getPlacedBuilding() != null) {
+                        String label = tile.getPlacedBuilding().getName();
+                        String letter = (label == null || label.isEmpty()) ? "B" : label.substring(0, 1).toUpperCase();
+                        g2.setColor(Color.BLACK);
+                        g2.setFont(new Font("Arial", Font.BOLD, 12));
+                        g2.drawString(letter, x * TILE_SIZE + 12, y * TILE_SIZE + 20);
+                    }
                 }
             }
         }
@@ -161,5 +167,132 @@ public class MapRenderer extends JPanel {
     public void setMap(game.map.Map map) {
         this.map = map;
         repaint();
+    }
+
+    private void drawRoad(Graphics2D g2, int x, int y) {
+        // Ellenőrizzük a szomszédos mezőket
+        boolean north = isRoadOrBuilding(x, y - 1);
+        boolean south = isRoadOrBuilding(x, y + 1);
+        boolean east = isRoadOrBuilding(x + 1, y);
+        boolean west = isRoadOrBuilding(x - 1, y);
+
+        int px = x * TILE_SIZE;
+        int py = y * TILE_SIZE;
+
+        // Alap út háttér (sötét szürke aszfalt)
+        g2.setColor(new Color(60, 60, 60));
+        g2.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+
+        // Út szélek (még sötétebb)
+        g2.setColor(new Color(40, 40, 40));
+        g2.drawRect(px, py, TILE_SIZE - 1, TILE_SIZE - 1);
+
+        // Út fő része (világosabb szürke)
+        g2.setColor(new Color(80, 80, 80));
+        
+        int roadWidth = (int)(TILE_SIZE * 0.7);
+        int margin = (TILE_SIZE - roadWidth) / 2;
+
+        // Alapértelmezett: teljes mező
+        int roadX = px;
+        int roadY = py;
+        int roadW = TILE_SIZE;
+        int roadH = TILE_SIZE;
+
+        // Határozzuk meg az út irányát és rajzoljuk meg
+        int connectionCount = (north ? 1 : 0) + (south ? 1 : 0) + (east ? 1 : 0) + (west ? 1 : 0);
+        
+        if ((north || south) && !(east || west)) {
+            // Függőleges út
+            roadX = px + margin;
+            roadW = roadWidth;
+            g2.fillRect(roadX, roadY, roadW, roadH);
+            
+            // Középvonal (szaggatott fehér)
+            drawDashedLine(g2, roadX + roadW / 2, roadY, roadX + roadW / 2, roadY + TILE_SIZE, 
+                          new Color(220, 220, 220), 1);
+        } else if ((east || west) && !(north || south)) {
+            // Vízszintes út
+            roadY = py + margin;
+            roadH = roadWidth;
+            g2.fillRect(roadX, roadY, roadW, roadH);
+            
+            // Középvonal (szaggatott fehér)
+            drawDashedLine(g2, roadX, roadY + roadH / 2, roadX + TILE_SIZE, roadY + roadH / 2, 
+                          new Color(220, 220, 220), 1);
+        } else if (connectionCount == 2) {
+            // Kanyar (pontosan 2 kapcsolódás, nem szemben)
+            drawCorner(g2, px, py, margin, roadWidth, north, south, east, west);
+        } else {
+            // Kereszteződés vagy T-elágazás (3+ kapcsolódás)
+            g2.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            
+            if (connectionCount >= 3) {
+                // Kereszteződés vagy T-elágazás jelölése
+                g2.setColor(new Color(200, 200, 200));
+                int centerSize = 4;
+                g2.fillRect(px + TILE_SIZE / 2 - centerSize / 2, 
+                           py + TILE_SIZE / 2 - centerSize / 2, 
+                           centerSize, centerSize);
+            }
+        }
+    }
+
+    private void drawCorner(Graphics2D g2, int px, int py, int margin, int roadWidth, 
+                           boolean north, boolean south, boolean east, boolean west) {
+        // Kanyar rajzolása - L alakú út két szakaszból
+        g2.setColor(new Color(80, 80, 80));
+        
+        int centerX = px + margin + roadWidth / 2;
+        int centerY = py + margin + roadWidth / 2;
+        
+        if (north && east) {
+            // Észak-Kelet kanyar (┗ alakú)
+            g2.fillRect(px + margin, py, roadWidth, TILE_SIZE / 2 + margin);  // Függőleges rész
+            g2.fillRect(px + margin, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+            
+            // Középvonalak
+            drawDashedLine(g2, centerX, py, centerX, centerY, new Color(220, 220, 220), 1);  // Függőleges
+            drawDashedLine(g2, centerX, centerY, px + TILE_SIZE, centerY, new Color(220, 220, 220), 1);  // Vízszintes
+        } else if (north && west) {
+            // Észak-Nyugat kanyar (┛ alakú)
+            g2.fillRect(px + margin, py, roadWidth, TILE_SIZE / 2 + margin);  // Függőleges rész
+            g2.fillRect(px, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+            
+            // Középvonalak
+            drawDashedLine(g2, centerX, py, centerX, centerY, new Color(220, 220, 220), 1);  // Függőleges
+            drawDashedLine(g2, px, centerY, centerX, centerY, new Color(220, 220, 220), 1);  // Vízszintes
+        } else if (south && east) {
+            // Dél-Kelet kanyar (┏ alakú)
+            g2.fillRect(px + margin, py + margin, roadWidth, TILE_SIZE - margin);  // Függőleges rész
+            g2.fillRect(px + margin, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+            
+            // Középvonalak
+            drawDashedLine(g2, centerX, centerY, centerX, py + TILE_SIZE, new Color(220, 220, 220), 1);  // Függőleges
+            drawDashedLine(g2, centerX, centerY, px + TILE_SIZE, centerY, new Color(220, 220, 220), 1);  // Vízszintes
+        } else if (south && west) {
+            // Dél-Nyugat kanyar (┓ alakú)
+            g2.fillRect(px + margin, py + margin, roadWidth, TILE_SIZE - margin);  // Függőleges rész
+            g2.fillRect(px, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+            
+            // Középvonalak
+            drawDashedLine(g2, centerX, centerY, centerX, py + TILE_SIZE, new Color(220, 220, 220), 1);  // Függőleges
+            drawDashedLine(g2, px, centerY, centerX, centerY, new Color(220, 220, 220), 1);  // Vízszintes
+        }
+    }
+
+    private void drawDashedLine(Graphics2D g2, int x1, int y1, int x2, int y2, Color color, int thickness) {
+        g2.setColor(color);
+        Stroke oldStroke = g2.getStroke();
+        g2.setStroke(new BasicStroke(thickness, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 
+                                    10.0f, new float[]{4.0f, 4.0f}, 0.0f));
+        g2.drawLine(x1, y1, x2, y2);
+        g2.setStroke(oldStroke);
+    }
+
+    private boolean isRoadOrBuilding(int x, int y) {
+        Tile tile = map.getTile(x, y);
+        if (tile == null) return false;
+        return tile.getType() == TileType.ROAD || tile.getType() == TileType.BUILDING;
     }
 }
