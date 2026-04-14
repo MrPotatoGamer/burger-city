@@ -11,7 +11,7 @@ public class MainMenuUI extends JFrame {
     private JPanel backgroundPanel;
 
     public MainMenuUI() {
-        setTitle("BurgerCity - Main Menu");
+        setTitle("BurgerCity - Főmenü");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 600);
         setLocationRelativeTo(null);
@@ -25,7 +25,7 @@ public class MainMenuUI extends JFrame {
                 try {
                     backgroundImage = new ImageIcon("src/main/java/game/assets/main_menu_bg.png").getImage();
                 } catch (Exception e) {
-                    System.err.println("Failed to load background image: " + e.getMessage());
+                    System.err.println("A háttérkép betöltése nem sikerült: " + e.getMessage());
                 }
             }
 
