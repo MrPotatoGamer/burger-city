@@ -243,22 +243,41 @@ public class MapRenderer extends JPanel {
         // Kanyar rajzolása - L alakú út két szakaszból
         g2.setColor(new Color(80, 80, 80));
         
+        int centerX = px + margin + roadWidth / 2;
+        int centerY = py + margin + roadWidth / 2;
+        
         if (north && east) {
             // Észak-Kelet kanyar (┗ alakú)
             g2.fillRect(px + margin, py, roadWidth, TILE_SIZE / 2 + margin);  // Függőleges rész
             g2.fillRect(px + margin, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+            
+            // Középvonalak
+            drawDashedLine(g2, centerX, py, centerX, centerY, new Color(220, 220, 220), 1);  // Függőleges
+            drawDashedLine(g2, centerX, centerY, px + TILE_SIZE, centerY, new Color(220, 220, 220), 1);  // Vízszintes
         } else if (north && west) {
             // Észak-Nyugat kanyar (┛ alakú)
             g2.fillRect(px + margin, py, roadWidth, TILE_SIZE / 2 + margin);  // Függőleges rész
             g2.fillRect(px, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+            
+            // Középvonalak
+            drawDashedLine(g2, centerX, py, centerX, centerY, new Color(220, 220, 220), 1);  // Függőleges
+            drawDashedLine(g2, px, centerY, centerX, centerY, new Color(220, 220, 220), 1);  // Vízszintes
         } else if (south && east) {
             // Dél-Kelet kanyar (┏ alakú)
             g2.fillRect(px + margin, py + margin, roadWidth, TILE_SIZE - margin);  // Függőleges rész
             g2.fillRect(px + margin, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+            
+            // Középvonalak
+            drawDashedLine(g2, centerX, centerY, centerX, py + TILE_SIZE, new Color(220, 220, 220), 1);  // Függőleges
+            drawDashedLine(g2, centerX, centerY, px + TILE_SIZE, centerY, new Color(220, 220, 220), 1);  // Vízszintes
         } else if (south && west) {
             // Dél-Nyugat kanyar (┓ alakú)
             g2.fillRect(px + margin, py + margin, roadWidth, TILE_SIZE - margin);  // Függőleges rész
             g2.fillRect(px, py + margin, TILE_SIZE - margin, roadWidth);  // Vízszintes rész
+            
+            // Középvonalak
+            drawDashedLine(g2, centerX, centerY, centerX, py + TILE_SIZE, new Color(220, 220, 220), 1);  // Függőleges
+            drawDashedLine(g2, px, centerY, centerX, centerY, new Color(220, 220, 220), 1);  // Vízszintes
         }
     }
 
