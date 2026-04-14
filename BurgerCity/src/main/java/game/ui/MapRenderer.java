@@ -30,6 +30,7 @@ public class MapRenderer extends JPanel {
     private BufferedImage cityTexture;
     private BufferedImage truckTexture;
     private BufferedImage busTexture;
+    private BufferedImage wheatTexture;
 
     public MapRenderer(game.map.Map map) {
         this.map = map;
@@ -107,6 +108,19 @@ public class MapRenderer extends JPanel {
             busTexture = null;
         }
 
+        // Wheat textúra betöltése és előre skálázása
+        try {
+            BufferedImage originalWheat = ImageIO.read(new File("src/main/java/game/assets/wheat.png"));
+            wheatTexture = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = wheatTexture.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(originalWheat, 0, 0, TILE_SIZE, TILE_SIZE, null);
+            g.dispose();
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni a wheat textúrát: " + e.getMessage());
+            wheatTexture = null;
+        }
+
         setBackground(Color.BLACK);
 
         // Kamera inicializálása
@@ -181,6 +195,8 @@ public class MapRenderer extends JPanel {
                     // Fű tile-ok át lesznek ugorva, mert egy cache réteget rajzolunk
                 } else if (tile.getType() == TileType.CITY) {
                     // City tile-ok külön renderelve lesznek (az egész város egyben)
+                } else if (tile.getType() == TileType.INDUSTRY) {
+                    // Industry tile-ok külön renderelve lesznek
                 } else {
                     // Normál mezők rajzolása
                     Color color = tileColors.getOrDefault(tile.getType(), Color.DARK_GRAY);
@@ -207,17 +223,11 @@ public class MapRenderer extends JPanel {
             drawCity(g2, city);
         }
 
-        // Ipari létesítmények neve és típusa
+        // Ipari létesítmények renderelése
         int indFontSize = Math.max(7, (int) (8 * zoom));
         g2.setFont(new Font("Arial", Font.PLAIN, indFontSize));
         for (Industry ind : map.getIndustries()) {
-            Color indColor = industryColors.getOrDefault(ind.getIndustryType(), Color.ORANGE);
-            int px = ind.getOriginX() * TILE_SIZE + 2;
-            int py = ind.getOriginY() * TILE_SIZE + 11;
-            g2.setColor(Color.BLACK);
-            g2.drawString(ind.getName(), px + 1, py + 1);
-            g2.setColor(indColor.brighter());
-            g2.drawString(ind.getName(), px, py);
+            drawIndustry(g2, ind);
         }
 
         // Járművek kirajzolása
@@ -447,5 +457,46 @@ public class MapRenderer extends JPanel {
         g2.drawString(city.getName(), nameX + 1, nameY + 1);
         g2.setColor(Color.WHITE);
         g2.drawString(city.getName(), nameX, nameY);
+    }
+
+    private void drawIndustry(Graphics2D g2, Industry ind) {
+        int px = ind.getOriginX() * TILE_SIZE;
+        int py = ind.getOriginY() * TILE_SIZE;
+        int width = 2;  // Industries are 2x2 tiles
+        int height = 2;
+
+        // Ha Farm típusú, akkor wheat textúrát használunk tile-onként
+        if (ind.getIndustryType() == IndustryType.FARM && wheatTexture != null) {
+            // Wheat textúra minden tile-ra külön
+            for (int dx = 0; dx < width; dx++) {
+                for (int dy = 0; dy < height; dy++) {
+                    int tileX = px + dx * TILE_SIZE;
+                    int tileY = py + dy * TILE_SIZE;
+                    g2.drawImage(wheatTexture, tileX, tileY, null);
+                }
+            }
+
+            // Szegély az egész farm körül
+            g2.setColor(new Color(100, 80, 50, 100));
+            g2.setStroke(new BasicStroke(2.0f));
+            g2.drawRect(px, py, width * TILE_SIZE - 1, height * TILE_SIZE - 1);
+            g2.setStroke(new BasicStroke(1.0f));
+        } else {
+            // Fallback: színes terület más industry típusokhoz
+            Color indColor = industryColors.getOrDefault(ind.getIndustryType(), Color.ORANGE);
+            g2.setColor(indColor);
+            g2.fillRect(px, py, width * TILE_SIZE, height * TILE_SIZE);
+            g2.setColor(Color.BLACK);
+            g2.drawRect(px, py, width * TILE_SIZE - 1, height * TILE_SIZE - 1);
+        }
+
+        // Industry neve
+        int nameX = px + 2;
+        int nameY = py + 11;
+        Color indColor = industryColors.getOrDefault(ind.getIndustryType(), Color.ORANGE);
+        g2.setColor(Color.BLACK);
+        g2.drawString(ind.getName(), nameX + 1, nameY + 1);
+        g2.setColor(indColor.brighter());
+        g2.drawString(ind.getName(), nameX, nameY);
     }
 }
