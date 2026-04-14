@@ -28,6 +28,8 @@ public class MapRenderer extends JPanel {
     private BufferedImage grassTexture;
     private BufferedImage grassLayerCache;
     private BufferedImage cityTexture;
+    private BufferedImage truckTexture;
+    private BufferedImage busTexture;
 
     public MapRenderer(game.map.Map map) {
         this.map = map;
@@ -75,6 +77,34 @@ public class MapRenderer extends JPanel {
         } catch (IOException e) {
             System.err.println("Nem sikerült betölteni a város textúrát: " + e.getMessage());
             cityTexture = null;
+        }
+
+        // Truck textúra betöltése és előre skálázása
+        try {
+            BufferedImage originalTruck = ImageIO.read(new File("src/main/java/game/assets/truck.png"));
+            int vehicleSize = TILE_SIZE / 2;
+            truckTexture = new BufferedImage(vehicleSize, vehicleSize, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = truckTexture.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(originalTruck, 0, 0, vehicleSize, vehicleSize, null);
+            g.dispose();
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni a truck textúrát: " + e.getMessage());
+            truckTexture = null;
+        }
+
+        // Bus textúra betöltése és előre skálázása
+        try {
+            BufferedImage originalBus = ImageIO.read(new File("src/main/java/game/assets/bus.png"));
+            int vehicleSize = TILE_SIZE / 2;
+            busTexture = new BufferedImage(vehicleSize, vehicleSize, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = busTexture.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(originalBus, 0, 0, vehicleSize, vehicleSize, null);
+            g.dispose();
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni a bus textúrát: " + e.getMessage());
+            busTexture = null;
         }
 
         setBackground(Color.BLACK);
@@ -197,14 +227,27 @@ public class MapRenderer extends JPanel {
             int vx = (int) Math.round(v.getWorldX() - vehicleSize / 2.0);
             int vy = (int) Math.round(v.getWorldY() - vehicleSize / 2.0);
 
-            Color vehicleColor = Color.WHITE;
-            if (v instanceof Truck) vehicleColor = Color.RED;
-            if (v instanceof Bus) vehicleColor = Color.BLUE;
+            BufferedImage vehicleImage = null;
+            Color fallbackColor = Color.WHITE;
 
-            g2.setColor(Color.BLACK);
-            g2.fillOval(vx + 1, vy + 1, vehicleSize, vehicleSize);
-            g2.setColor(vehicleColor);
-            g2.fillOval(vx, vy, vehicleSize, vehicleSize);
+            if (v instanceof Truck) {
+                vehicleImage = truckTexture;
+                fallbackColor = Color.RED;
+            } else if (v instanceof Bus) {
+                vehicleImage = busTexture;
+                fallbackColor = Color.BLUE;
+            }
+
+            if (vehicleImage != null) {
+                // Textúra rajzolása
+                g2.drawImage(vehicleImage, vx, vy, null);
+            } else {
+                // Fallback: színes kör
+                g2.setColor(Color.BLACK);
+                g2.fillOval(vx + 1, vy + 1, vehicleSize, vehicleSize);
+                g2.setColor(fallbackColor);
+                g2.fillOval(vx, vy, vehicleSize, vehicleSize);
+            }
         }
     }
 
