@@ -5,10 +5,14 @@ import game.vehicle.Bus;
 import game.vehicle.Truck;
 import game.vehicle.Vehicle;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 
@@ -21,6 +25,7 @@ public class MapRenderer extends JPanel {
     private final java.util.Map<IndustryType, Color> industryColors = new HashMap<>();
     private Camera camera;
     private List<Vehicle> vehicles = List.of();
+    private BufferedImage grassTexture;
 
     public MapRenderer(game.map.Map map) {
         this.map = map;
@@ -37,6 +42,14 @@ public class MapRenderer extends JPanel {
         industryColors.put(IndustryType.PATTY_PLANT,    new Color(200, 130, 130));
         industryColors.put(IndustryType.BURGER_FACTORY, new Color(180, 100, 100));
         industryColors.put(IndustryType.FACTORY,        new Color(180, 100, 100));
+
+        // Fű textúra betöltése
+        try {
+            grassTexture = ImageIO.read(new File("src/main/java/game/assets/grass.png"));
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni a fű textúrát: " + e.getMessage());
+            grassTexture = null;
+        }
 
         setBackground(Color.BLACK);
 
@@ -102,6 +115,16 @@ public class MapRenderer extends JPanel {
                 if (tile.getType() == TileType.ROAD) {
                     // Speciális útrajzolás
                     drawRoad(g2, x, y);
+                } else if (tile.getType() == TileType.GRASS) {
+                    // Fű textúra rajzolása
+                    if (grassTexture != null) {
+                        g2.drawImage(grassTexture, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, null);
+                    } else {
+                        // Fallback ha nincs textúra
+                        Color color = tileColors.get(TileType.GRASS);
+                        g2.setColor(color);
+                        g2.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    }
                 } else {
                     // Normál mezők rajzolása
                     Color color = tileColors.getOrDefault(tile.getType(), Color.DARK_GRAY);
