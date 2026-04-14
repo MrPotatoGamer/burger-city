@@ -15,7 +15,7 @@ public class MainMenuUI extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 600);
         setLocationRelativeTo(null);
-        setResizable(false);
+        setResizable(true);
 
         // Background panel with custom painting
         backgroundPanel = new JPanel() {
@@ -77,6 +77,7 @@ public class MainMenuUI extends JFrame {
                 );
             }
         });
+
 
         // Add buttons to panel with spacing
         buttonPanel.add(newGameButton);
@@ -152,6 +153,23 @@ public class MainMenuUI extends JFrame {
         return button;
     }
 
+    private void toggleFullscreen() {
+        GraphicsDevice device = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        
+        if (device.getFullScreenWindow() == this) {
+            // Exit fullscreen
+            device.setFullScreenWindow(null);
+            setResizable(true);
+        } else {
+            // Enter fullscreen
+            setResizable(false);
+            dispose();
+            setUndecorated(true);
+            device.setFullScreenWindow(this);
+            setVisible(true);
+        }
+    }
+
     private void startNewGame() {
         String gameName = JOptionPane.showInputDialog(
                 this,
@@ -161,6 +179,12 @@ public class MainMenuUI extends JFrame {
         );
 
         if (gameName != null && !gameName.trim().isEmpty()) {
+            // Exit fullscreen before starting game
+            GraphicsDevice device = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+            if (device.getFullScreenWindow() == this) {
+                device.setFullScreenWindow(null);
+            }
+            
             // Close main menu and start game
             dispose();
             SwingUtilities.invokeLater(() -> {
