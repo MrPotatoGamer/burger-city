@@ -83,7 +83,7 @@ public class MapRenderer extends JPanel {
         // Truck textúra betöltése és előre skálázása
         try {
             BufferedImage originalTruck = ImageIO.read(new File("src/main/java/game/assets/truck.png"));
-            int vehicleSize = TILE_SIZE / 2;
+            int vehicleSize = TILE_SIZE;
             truckTexture = new BufferedImage(vehicleSize, vehicleSize, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = truckTexture.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -97,7 +97,7 @@ public class MapRenderer extends JPanel {
         // Bus textúra betöltése és előre skálázása
         try {
             BufferedImage originalBus = ImageIO.read(new File("src/main/java/game/assets/bus.png"));
-            int vehicleSize = TILE_SIZE / 2;
+            int vehicleSize = TILE_SIZE;
             busTexture = new BufferedImage(vehicleSize, vehicleSize, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = busTexture.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
