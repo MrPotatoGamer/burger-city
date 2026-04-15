@@ -31,6 +31,10 @@ public class MapRenderer extends JPanel {
     private BufferedImage truckTexture;
     private BufferedImage busTexture;
     private BufferedImage wheatTexture;
+    private BufferedImage bakeryTexture;
+    private BufferedImage burgerFactoryTexture;
+    private BufferedImage ranchTexture;
+    private BufferedImage pattyPlantTexture;
 
     public MapRenderer(game.map.Map map) {
         this.map = map;
@@ -119,6 +123,38 @@ public class MapRenderer extends JPanel {
         } catch (IOException e) {
             System.err.println("Nem sikerült betölteni a wheat textúrát: " + e.getMessage());
             wheatTexture = null;
+        }
+
+        // Bakery textúra betöltése
+        try {
+            bakeryTexture = ImageIO.read(new File("src/main/java/game/assets/bakery.png"));
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni a bakery textúrát: " + e.getMessage());
+            bakeryTexture = null;
+        }
+
+        // Burger Factory textúra betöltése
+        try {
+            burgerFactoryTexture = ImageIO.read(new File("src/main/java/game/assets/burger_factory.png"));
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni a burger_factory textúrát: " + e.getMessage());
+            burgerFactoryTexture = null;
+        }
+
+        // Ranch textúra betöltése
+        try {
+            ranchTexture = ImageIO.read(new File("src/main/java/game/assets/ranch.jpg"));
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni a ranch textúrát: " + e.getMessage());
+            ranchTexture = null;
+        }
+
+        // Patty Plant textúra betöltése
+        try {
+            pattyPlantTexture = ImageIO.read(new File("src/main/java/game/assets/patty_plant.png"));
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni a patty_plant textúrát: " + e.getMessage());
+            pattyPlantTexture = null;
         }
 
         setBackground(Color.BLACK);
@@ -464,30 +500,63 @@ public class MapRenderer extends JPanel {
         int py = ind.getOriginY() * TILE_SIZE;
         int width = 2;  // Industries are 2x2 tiles
         int height = 2;
+        int totalWidth = width * TILE_SIZE;
+        int totalHeight = height * TILE_SIZE;
 
-        // Ha Farm típusú, akkor wheat textúrát használunk tile-onként
-        if (ind.getIndustryType() == IndustryType.FARM && wheatTexture != null) {
-            // Wheat textúra minden tile-ra külön
-            for (int dx = 0; dx < width; dx++) {
-                for (int dy = 0; dy < height; dy++) {
-                    int tileX = px + dx * TILE_SIZE;
-                    int tileY = py + dy * TILE_SIZE;
-                    g2.drawImage(wheatTexture, tileX, tileY, null);
+        BufferedImage industryTexture = null;
+
+        // Textúra kiválasztása az industry típusa alapján
+        switch (ind.getIndustryType()) {
+            case FARM:
+                // Farm esetén wheat textúrát használunk tile-onként
+                if (wheatTexture != null) {
+                    for (int dx = 0; dx < width; dx++) {
+                        for (int dy = 0; dy < height; dy++) {
+                            int tileX = px + dx * TILE_SIZE;
+                            int tileY = py + dy * TILE_SIZE;
+                            g2.drawImage(wheatTexture, tileX, tileY, null);
+                        }
+                    }
+                    // Szegély az egész farm körül
+                    g2.setColor(new Color(100, 80, 50, 100));
+                    g2.setStroke(new BasicStroke(2.0f));
+                    g2.drawRect(px, py, totalWidth - 1, totalHeight - 1);
+                    g2.setStroke(new BasicStroke(1.0f));
                 }
-            }
+                break;
+            case BAKERY:
+                industryTexture = bakeryTexture;
+                break;
+            case BURGER_FACTORY:
+                industryTexture = burgerFactoryTexture;
+                break;
+            case RANCH:
+                industryTexture = ranchTexture;
+                break;
+            case PATTY_PLANT:
+                industryTexture = pattyPlantTexture;
+                break;
+            default:
+                industryTexture = null;
+                break;
+        }
 
-            // Szegély az egész farm körül
-            g2.setColor(new Color(100, 80, 50, 100));
+        // Ha van textúra és nem Farm típus, rajzoljuk meg az egész területre
+        if (industryTexture != null && ind.getIndustryType() != IndustryType.FARM) {
+            g2.drawImage(industryTexture, px, py, totalWidth, totalHeight, null);
+
+            // Szegély az egész industry körül
+            g2.setColor(new Color(50, 50, 50, 120));
             g2.setStroke(new BasicStroke(2.0f));
-            g2.drawRect(px, py, width * TILE_SIZE - 1, height * TILE_SIZE - 1);
+            g2.drawRect(px, py, totalWidth - 1, totalHeight - 1);
             g2.setStroke(new BasicStroke(1.0f));
-        } else {
-            // Fallback: színes terület más industry típusokhoz
+        } else if (ind.getIndustryType() != IndustryType.FARM) {
+            // Fallback: színes terület ha nincs textúra
             Color indColor = industryColors.getOrDefault(ind.getIndustryType(), Color.ORANGE);
             g2.setColor(indColor);
-            g2.fillRect(px, py, width * TILE_SIZE, height * TILE_SIZE);
+            g2.fillRect(px, py, totalWidth, totalHeight);
             g2.setColor(Color.BLACK);
-            g2.drawRect(px, py, width * TILE_SIZE - 1, height * TILE_SIZE - 1);
+            g2.drawRect(px, py, totalWidth - 1, totalHeight - 1);
         }
 
         // Industry neve
