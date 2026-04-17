@@ -138,7 +138,7 @@ public class Vehicle {
      * @param deltaSeconds Time elapsed since last update.
      */
     public void update(Map map, double deltaSeconds) {
-        update(map, deltaSeconds, null);
+        update(map, deltaSeconds, null, null);
     }
 
     /**
@@ -148,6 +148,17 @@ public class Vehicle {
      * @param allVehicles All vehicles in the game for traffic checking (can be null).
      */
     public void update(Map map, double deltaSeconds, List<Vehicle> allVehicles) {
+        update(map, deltaSeconds, allVehicles, null);
+    }
+
+    /**
+     * Move along connected ROAD tiles with traffic awareness and traffic lights.
+     * @param map The game map.
+     * @param deltaSeconds Time elapsed since last update.
+     * @param allVehicles All vehicles in the game for traffic checking (can be null).
+     * @param trafficLights All traffic lights in the game (can be null).
+     */
+    public void update(Map map, double deltaSeconds, List<Vehicle> allVehicles, List<game.building.TrafficLight> trafficLights) {
         Objects.requireNonNull(map, "map");
         if (deltaSeconds <= 0) return;
 
@@ -156,7 +167,7 @@ public class Vehicle {
 
         // If we don't have a target yet, try to acquire one.
         if (targetTileX == null || targetTileY == null) {
-            chooseNextTarget(map, allVehicles);
+            chooseNextTarget(map, allVehicles, trafficLights);
             return;
         }
 
@@ -171,7 +182,7 @@ public class Vehicle {
 
         // Arrived (snap).
         if (dist < 0.01) {
-            arriveAtTarget(map, allVehicles);
+            arriveAtTarget(map, allVehicles, trafficLights);
             return;
         }
 
@@ -180,7 +191,7 @@ public class Vehicle {
         if (step >= dist) {
             worldX = targetX;
             worldY = targetY;
-            arriveAtTarget(map, allVehicles);
+            arriveAtTarget(map, allVehicles, trafficLights);
             return;
         }
 
@@ -269,10 +280,14 @@ public class Vehicle {
     }
 
     protected void arriveAtTarget(Map map) {
-        arriveAtTarget(map, null);
+        arriveAtTarget(map, null, null);
     }
 
     protected void arriveAtTarget(Map map, List<Vehicle> allVehicles) {
+        arriveAtTarget(map, allVehicles, null);
+    }
+
+    protected void arriveAtTarget(Map map, List<Vehicle> allVehicles, List<game.building.TrafficLight> trafficLights) {
         if (targetTileX == null || targetTileY == null) return;
         previousTileX = currentTileX;
         previousTileY = currentTileY;
@@ -300,7 +315,7 @@ public class Vehicle {
         }
 
         arrivedThisUpdate = true;
-        chooseNextTarget(map, allVehicles);
+        chooseNextTarget(map, allVehicles, trafficLights);
     }
 
     protected void updateDirection() {
@@ -312,10 +327,14 @@ public class Vehicle {
     }
 
     protected void chooseNextTarget(Map map) {
-        chooseNextTarget(map, null);
+        chooseNextTarget(map, null, null);
     }
 
     protected void chooseNextTarget(Map map, List<Vehicle> allVehicles) {
+        chooseNextTarget(map, allVehicles, null);
+    }
+
+    protected void chooseNextTarget(Map map, List<Vehicle> allVehicles, List<game.building.TrafficLight> trafficLights) {
         if (!hasPath()) {
             targetTileX = null;
             targetTileY = null;
@@ -361,17 +380,32 @@ public class Vehicle {
         // Calculate what our direction WILL BE when we move to next tile
         int plannedDirection = getPlannedDirection(next[0], next[1]);
 
+        // Check for traffic light at the next tile
+        game.building.TrafficLight lightAtNext = findTrafficLightAt(trafficLights, next[0], next[1]);
+        if (lightAtNext != null) {
+            // Check if light is red for our direction
+            if (!lightAtNext.isGreen(plannedDirection)) {
+                // MUST STOP at red light
+                targetTileX = null;
+                targetTileY = null;
+                return;
+            }
+        }
+
         // Check for intersection conflict before setting target
         if (allVehicles != null && isIntersection(map, next[0], next[1])) {
-            if (hasIntersectionConflict(next[0], next[1], allVehicles, plannedDirection)) {
+            // If there's a traffic light, don't use intersection priority rules
+            if (lightAtNext == null && hasIntersectionConflict(next[0], next[1], allVehicles, plannedDirection)) {
                 // Wait - don't set target yet
                 targetTileX = null;
                 targetTileY = null;
                 return;
             }
-            // Claim this intersection as ours
-            intersectionClaimX = next[0];
-            intersectionClaimY = next[1];
+            // Claim this intersection as ours (only if no traffic light)
+            if (lightAtNext == null) {
+                intersectionClaimX = next[0];
+                intersectionClaimY = next[1];
+            }
         } else {
             // Not an intersection or no conflict, clear claim
             intersectionClaimX = null;
@@ -381,6 +415,19 @@ public class Vehicle {
         targetTileX = next[0];
         targetTileY = next[1];
         pathIndex = nextIndex;
+    }
+
+    /**
+     * Find a traffic light at the specified coordinates.
+     */
+    private static game.building.TrafficLight findTrafficLightAt(List<game.building.TrafficLight> trafficLights, int x, int y) {
+        if (trafficLights == null) return null;
+        for (game.building.TrafficLight light : trafficLights) {
+            if (light != null && light.getX() == x && light.getY() == y) {
+                return light;
+            }
+        }
+        return null;
     }
 
     /**

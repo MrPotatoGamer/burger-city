@@ -57,6 +57,7 @@ public class GameUI extends JFrame {
     }
 
     private final List<Vehicle> vehicles = new ArrayList<>();
+    private final List<TrafficLight> trafficLights = new ArrayList<>();
     private long lastTickNanos;
     private Timer gameTimer;
 
@@ -539,6 +540,11 @@ public class GameUI extends JFrame {
         };
 
         if (map.buildBuilding(tileX, tileY, building)) {
+            // Add traffic light to the list for updates
+            if (building instanceof TrafficLight) {
+                trafficLights.add((TrafficLight) building);
+                mapRenderer.setTrafficLights(trafficLights);
+            }
             mapRenderer.repaint();
             updateStatus("Épület sikeresen lerakva: " + building.getName() + " (" + tileX + ", " + tileY + "). Pénz: " + player.getMoney() + "$");
         } else {
@@ -812,10 +818,60 @@ public class GameUI extends JFrame {
             }
         }
 
+        // Check traffic lights
+        for (TrafficLight light : trafficLights) {
+            if (light != null && light.getX() == tileX && light.getY() == tileY) {
+                showTrafficLightSettings(light);
+                updateStatus("Configuring traffic light at (" + tileX + ", " + tileY + ")");
+                return;
+            }
+        }
+
         // Clicked on empty space — clear inspection
         if (dashboard.hasInspection()) {
             dashboard.clearInspection();
             updateStatus("Mini Transport Tycoon | BurgerCity");
+        }
+    }
+
+    private void showTrafficLightSettings(TrafficLight light) {
+        JPanel panel = new JPanel(new GridLayout(4, 2, 5, 5));
+
+        JLabel mainLabel = new JLabel("North-South (Main) duration (sec):");
+        JTextField mainField = new JTextField(String.valueOf((int)light.getGreenDurationMain()));
+
+        JLabel crossLabel = new JLabel("East-West (Cross) duration (sec):");
+        JTextField crossField = new JTextField(String.valueOf((int)light.getGreenDurationCross()));
+
+        panel.add(mainLabel);
+        panel.add(mainField);
+        panel.add(crossLabel);
+        panel.add(crossField);
+
+        int result = JOptionPane.showConfirmDialog(
+            this,
+            panel,
+            "Traffic Light Settings at (" + light.getX() + ", " + light.getY() + ")",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.PLAIN_MESSAGE
+        );
+
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                double mainDuration = Double.parseDouble(mainField.getText());
+                double crossDuration = Double.parseDouble(crossField.getText());
+
+                if (mainDuration < 1 || crossDuration < 1) {
+                    JOptionPane.showMessageDialog(this, "Durations must be at least 1 second!");
+                    return;
+                }
+
+                light.setDurations(mainDuration, crossDuration);
+                updateStatus("Traffic light settings updated: Main=" + mainDuration + "s, Cross=" + crossDuration + "s");
+
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Invalid number format!");
+            }
         }
     }
 
@@ -841,9 +897,14 @@ public class GameUI extends JFrame {
         if (!timeManager.isPaused()) {
             map.updateEconomy(gameDeltaSeconds);
 
+            // Update traffic lights
+            for (TrafficLight light : trafficLights) {
+                if (light != null) light.update(gameDeltaSeconds);
+            }
+
             for (Vehicle v : vehicles) {
                 if (v == null) continue;
-                v.update(map, gameDeltaSeconds, vehicles);
+                v.update(map, gameDeltaSeconds, vehicles, trafficLights);
                 v.processArrivalEconomy(map, player);
             }
         }
