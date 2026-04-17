@@ -518,14 +518,28 @@ public class GameUI extends JFrame {
             return;
         }
 
-        if (targetTile.getType() != TileType.GRASS) {
-            updateStatus("Csak üres fű mezőre lehet épületet rakni! Aktuális: " + targetTile.getType() + ".");
-            return;
-        }
+        // Special validation for Traffic Light: must be on ROAD intersection
+        if (selectedBuildableBuilding == BuildableBuilding.TRAFFIC_LIGHT) {
+            if (targetTile.getType() != TileType.ROAD) {
+                updateStatus("Közlekedési lámpa csak útra építhető!");
+                return;
+            }
+            if (targetTile.isOccupied()) {
+                updateStatus("Ez a mező foglalt (már van lámpa), ide nem lehet építeni.");
+                return;
+            }
+            // Intersection check will be done in map.buildBuilding()
+        } else {
+            // Regular buildings: must be on GRASS
+            if (targetTile.getType() != TileType.GRASS) {
+                updateStatus("Csak üres fű mezőre lehet épületet rakni! Aktuális: " + targetTile.getType() + ".");
+                return;
+            }
 
-        if (targetTile.isOccupied()) {
-            updateStatus("Ez a mező foglalt, ide nem lehet építeni.");
-            return;
+            if (targetTile.isOccupied()) {
+                updateStatus("Ez a mező foglalt, ide nem lehet építeni.");
+                return;
+            }
         }
 
         if (!player.spendMoney(BUILDING_COST)) {
@@ -549,7 +563,11 @@ public class GameUI extends JFrame {
             updateStatus("Épület sikeresen lerakva: " + building.getName() + " (" + tileX + ", " + tileY + "). Pénz: " + player.getMoney() + "$");
         } else {
             player.addMoney(BUILDING_COST);
-            updateStatus("Erre a mezőre nem építhető épület!");
+            if (building instanceof TrafficLight) {
+                updateStatus("Közlekedési lámpát csak kereszteződésre (3 vagy 4 utas) lehet építeni!");
+            } else {
+                updateStatus("Erre a mezőre nem építhető épület!");
+            }
         }
     }
 
