@@ -662,6 +662,9 @@ public class GameUI extends JFrame {
         if (tile.getType() == TileType.INDUSTRY) {
             var ind = map.demolishIndustryAt(tileX, tileY);
             if (ind != null) {
+                // Remove vehicles serving this industry
+                removeVehiclesServingBuilding(ind.getOriginX(), ind.getOriginY());
+
                 int refund = INDUSTRY_COST / 2;
                 player.addMoney(refund);
                 mapRenderer.repaint();
@@ -758,6 +761,8 @@ public class GameUI extends JFrame {
 
         Vehicle v = (choice == 0) ? new Bus() : new Truck();
         v.setPath(path);
+        v.setRouteBuildings(startBuilding.originX(), startBuilding.originY(),
+                            endBuilding.originX(), endBuilding.originY());
         vehicles.add(v);
         mapRenderer.repaint();
         updateStatus("Jármű lehelyezve: " + options[choice] + " | Útvonal: " + startBuilding.name() + " -> " + endBuilding.name());
@@ -1037,6 +1042,31 @@ public class GameUI extends JFrame {
                 updateStatus("Traffic light removed (no longer at intersection)");
             } else {
                 updateStatus(toRemove.size() + " traffic lights removed (no longer at intersections)");
+            }
+        }
+    }
+
+    /**
+     * Remove all vehicles that serve a building at the given origin coordinates.
+     * Called when a City or Industry is demolished.
+     */
+    public void removeVehiclesServingBuilding(int originX, int originY) {
+        List<Vehicle> toRemove = new ArrayList<>();
+
+        for (Vehicle v : vehicles) {
+            if (v != null && v.servesBuilding(originX, originY)) {
+                toRemove.add(v);
+            }
+        }
+
+        if (!toRemove.isEmpty()) {
+            vehicles.removeAll(toRemove);
+            mapRenderer.setVehicles(vehicles);
+
+            if (toRemove.size() == 1) {
+                updateStatus("1 vehicle removed (building destroyed)");
+            } else {
+                updateStatus(toRemove.size() + " vehicles removed (building destroyed)");
             }
         }
     }

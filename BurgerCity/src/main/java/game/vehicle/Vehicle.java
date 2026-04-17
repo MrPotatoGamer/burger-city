@@ -30,6 +30,12 @@ public class Vehicle {
     protected Resource currentCargo;
     protected Garage garage;
 
+    // Store the buildings this vehicle serves (for cleanup when building is destroyed)
+    protected Integer startBuildingOriginX;
+    protected Integer startBuildingOriginY;
+    protected Integer endBuildingOriginX;
+    protected Integer endBuildingOriginY;
+
     // World-position (pixel) coordinates, centered on tiles
     protected double worldX;
     protected double worldY;
@@ -126,6 +132,37 @@ public class Vehicle {
 
     public boolean hasPath() {
         return pathTiles != null && !pathTiles.isEmpty();
+    }
+
+    /**
+     * Set the buildings this vehicle serves (for tracking when buildings are destroyed).
+     * @param startOriginX Origin X of start building
+     * @param startOriginY Origin Y of start building
+     * @param endOriginX Origin X of end building
+     * @param endOriginY Origin Y of end building
+     */
+    public void setRouteBuildings(int startOriginX, int startOriginY, int endOriginX, int endOriginY) {
+        this.startBuildingOriginX = startOriginX;
+        this.startBuildingOriginY = startOriginY;
+        this.endBuildingOriginX = endOriginX;
+        this.endBuildingOriginY = endOriginY;
+    }
+
+    /**
+     * Check if this vehicle serves a building at the given origin coordinates.
+     */
+    public boolean servesBuilding(int originX, int originY) {
+        if (startBuildingOriginX != null && startBuildingOriginY != null) {
+            if (startBuildingOriginX == originX && startBuildingOriginY == originY) {
+                return true;
+            }
+        }
+        if (endBuildingOriginX != null && endBuildingOriginY != null) {
+            if (endBuildingOriginX == originX && endBuildingOriginY == originY) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public Resource getCurrentCargo() {
