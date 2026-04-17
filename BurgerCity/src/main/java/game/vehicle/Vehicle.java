@@ -11,6 +11,7 @@ import game.map.Industry;
 import game.map.Map;
 import game.map.Tile;
 import game.map.TileType;
+import game.save.GameSnapshot;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -71,6 +72,100 @@ public class Vehicle {
         // Interpreted as tiles per second (converted internally to pixels/sec)
         this.speed = 2;
         this.effectiveSpeed = this.speed;
+    }
+
+    public GameSnapshot.VehicleData exportSaveData() {
+        List<GameSnapshot.IntPair> pts = new ArrayList<>();
+        if (pathTiles != null) {
+            for (int[] p : pathTiles) {
+                if (p == null || p.length < 2) continue;
+                pts.add(new GameSnapshot.IntPair(p[0], p[1]));
+            }
+        }
+
+        GameSnapshot.CargoData cargoData = null;
+        if (currentCargo != null && !currentCargo.isEmpty()) {
+            cargoData = new GameSnapshot.CargoData(currentCargo.getType(), currentCargo.getAmount());
+        }
+
+        GameSnapshot.RouteBuildingsData rb = null;
+        if (startBuildingOriginX != null && startBuildingOriginY != null && endBuildingOriginX != null && endBuildingOriginY != null) {
+            rb = new GameSnapshot.RouteBuildingsData(startBuildingOriginX, startBuildingOriginY, endBuildingOriginX, endBuildingOriginY);
+        }
+
+        return new GameSnapshot.VehicleData(
+                getClass().getSimpleName(),
+                worldX,
+                worldY,
+                currentTileX,
+                currentTileY,
+                targetTileX,
+                targetTileY,
+                previousTileX,
+                previousTileY,
+                lastMoveDx,
+                lastMoveDy,
+                currentDirection,
+                pts,
+                pathIndex,
+                pathForward,
+                cargoData,
+                rb
+        );
+    }
+
+    public void importSaveData(GameSnapshot.VehicleData data) {
+        if (data == null) return;
+
+        this.worldX = data.worldX();
+        this.worldY = data.worldY();
+        this.currentTileX = data.currentTileX();
+        this.currentTileY = data.currentTileY();
+        this.targetTileX = data.targetTileX();
+        this.targetTileY = data.targetTileY();
+        this.previousTileX = data.previousTileX();
+        this.previousTileY = data.previousTileY();
+        this.lastMoveDx = data.lastMoveDx();
+        this.lastMoveDy = data.lastMoveDy();
+        this.currentDirection = data.currentDirection();
+
+        // Path
+        List<int[]> newPath = new ArrayList<>();
+        if (data.pathTiles() != null) {
+            for (GameSnapshot.IntPair p : data.pathTiles()) {
+                if (p == null) continue;
+                newPath.add(new int[]{p.x(), p.y()});
+            }
+        }
+        this.pathTiles = newPath;
+        this.pathIndex = Math.max(0, data.pathIndex());
+        this.pathForward = data.pathForward();
+
+        // Cargo
+        if (data.cargo() != null && data.cargo().type() != null && data.cargo().amount() > 0) {
+            this.currentCargo = new Resource(data.cargo().type(), data.cargo().amount());
+        } else {
+            this.currentCargo = null;
+        }
+
+        // Route building origins
+        if (data.routeBuildings() != null) {
+            this.startBuildingOriginX = data.routeBuildings().startOriginX();
+            this.startBuildingOriginY = data.routeBuildings().startOriginY();
+            this.endBuildingOriginX = data.routeBuildings().endOriginX();
+            this.endBuildingOriginY = data.routeBuildings().endOriginY();
+        } else {
+            this.startBuildingOriginX = null;
+            this.startBuildingOriginY = null;
+            this.endBuildingOriginX = null;
+            this.endBuildingOriginY = null;
+        }
+
+        // Reset transient fields
+        this.arrivedThisUpdate = false;
+        this.effectiveSpeed = this.speed;
+        this.intersectionClaimX = null;
+        this.intersectionClaimY = null;
     }
 
     public double getWorldX() {

@@ -12,6 +12,9 @@ import game.map.IndustryType;
 import game.map.Map;
 import game.map.Tile;
 import game.map.TileType;
+import game.save.GameSnapshot;
+import game.save.SaveGame;
+import game.save.SaveManager;
 import game.vehicle.Bus;
 import game.vehicle.Truck;
 import game.vehicle.Vehicle;
@@ -68,6 +71,11 @@ public class GameUI extends JFrame {
     private TimeManager timeManager;
     private TimeControlPanel timeControlPanel;
 
+    private final SaveManager saveManager = new SaveManager();
+
+    private JButton saveGameButton;
+    private JButton loadGameButton;
+
     private SelectedBuilding startBuilding;
     private SelectedBuilding endBuilding;
 
@@ -77,23 +85,37 @@ public class GameUI extends JFrame {
     private static final int INITIAL_WINDOW_HEIGHT = 720;
 
     public GameUI() {
+        this(null);
+    }
+
+    public GameUI(GameSnapshot snapshot) {
         setTitle("Mini Transport Tycoon - BurgerCity");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // Time manager initialization
-        timeManager = new TimeManager();
+        if (snapshot == null) {
+            // Time manager initialization
+            timeManager = new TimeManager();
 
-        // Játékos létrehozása kezdőpénzzel
-        player = new Player(10000);
+            // Játékos létrehozása kezdőpénzzel
+            player = new Player(10000);
 
-        // Térkép létrehozása és betöltése
-        map = new Map(50, 40);
-        map.loadPredefined();
+            // Térkép létrehozása és betöltése
+            map = new Map(50, 40);
+            map.loadPredefined();
+        } else {
+            SaveManager.LoadedState loaded = saveManager.instantiate(snapshot);
+            timeManager = loaded.timeManager();
+            player = loaded.player();
+            map = loaded.map();
+            vehicles.addAll(loaded.vehicles());
+            trafficLights.addAll(loaded.trafficLights());
+        }
 
         mapRenderer = new MapRenderer(map);
         mapRenderer.setPreferredSize(new Dimension(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT - 120));
         mapRenderer.setVehicles(vehicles);
+        mapRenderer.setTrafficLights(trafficLights);
 
         // Egér kezelése: drag (görgetés) és kattintás
         final Point[] dragStart = {null};
@@ -198,6 +220,14 @@ public class GameUI extends JFrame {
         demolishButton.addActionListener(e -> toggleDemolishMode());
         topPanel.add(demolishButton);
 
+        saveGameButton = new JButton("Mentés");
+        saveGameButton.addActionListener(e -> saveGame());
+        topPanel.add(saveGameButton);
+
+        loadGameButton = new JButton("Betöltés");
+        loadGameButton.addActionListener(e -> loadGame());
+        topPanel.add(loadGameButton);
+
         toggleDashboardButton = new JButton("Dashboard \u25C0");
         toggleDashboardButton.addActionListener(e -> toggleDashboard());
         topPanel.add(toggleDashboardButton);
@@ -220,6 +250,51 @@ public class GameUI extends JFrame {
         setSize(INITIAL_WINDOW_WIDTH + 310, INITIAL_WINDOW_HEIGHT);
         setLocationRelativeTo(null);
         setResizable(true);
+    }
+
+    private void saveGame() {
+        String saveName = JOptionPane.showInputDialog(this, "Mentés neve:", "Játék mentése", JOptionPane.PLAIN_MESSAGE);
+        if (saveName == null) return;
+        saveName = saveName.trim();
+        if (saveName.isEmpty()) saveName = "save";
+
+        try {
+            SaveGame sg = saveManager.createSave(saveName, map, player, timeManager, vehicles, trafficLights);
+            updateStatus("Mentés elkészült: " + sg.getSaveName());
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Mentés sikertelen: " + ex.getMessage(), "Hiba", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void loadGame() {
+        try {
+            List<SaveGame> saves = saveManager.listSaves();
+            if (saves.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Nincs elérhető mentés.", "Betöltés", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+
+            SaveGame selected = (SaveGame) JOptionPane.showInputDialog(
+                    this,
+                    "Válassz mentést:",
+                    "Játék betöltése",
+                    JOptionPane.PLAIN_MESSAGE,
+                    null,
+                    saves.toArray(),
+                    saves.get(0)
+            );
+
+            if (selected == null) return;
+
+            GameSnapshot snapshot = saveManager.loadSnapshot(selected);
+            dispose();
+            SwingUtilities.invokeLater(() -> {
+                GameUI ui = new GameUI(snapshot);
+                ui.setVisible(true);
+            });
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Betöltés sikertelen: " + ex.getMessage(), "Hiba", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void toggleRoadBuildMode() {
