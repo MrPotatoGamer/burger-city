@@ -1,5 +1,7 @@
 package game.building;
 
+import game.save.GameSnapshot;
+
 public class TrafficLight extends Building {
 
     public static final int COST = 1000;
@@ -97,5 +99,29 @@ public class TrafficLight extends Building {
         } else {
             switchToState("MAIN_GREEN");
         }
+    }
+
+    public GameSnapshot.TrafficLightData exportSaveData() {
+        return new GameSnapshot.TrafficLightData(
+                getX(),
+                getY(),
+                getCurrentState(),
+                getTimeInCurrentState(),
+                getGreenDurationMain(),
+                getGreenDurationCross()
+        );
+    }
+
+    /**
+     * Restore a traffic light from saved data.
+     */
+    public void restore(String state, double timeInState, double mainDuration, double crossDuration) {
+        setDurations(mainDuration, crossDuration);
+        if (state == null) state = "MAIN_GREEN";
+        if (!state.equals("MAIN_GREEN") && !state.equals("CROSS_GREEN")) {
+            state = "MAIN_GREEN";
+        }
+        this.currentState = state;
+        this.timeInCurrentState = Math.max(0.0, timeInState);
     }
 }

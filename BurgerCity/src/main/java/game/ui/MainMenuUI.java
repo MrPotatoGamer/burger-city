@@ -1,5 +1,9 @@
 package game.ui;
 
+import game.save.GameSnapshot;
+import game.save.SaveGame;
+import game.save.SaveManager;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -8,6 +12,7 @@ import java.awt.event.ActionListener;
 public class MainMenuUI extends JFrame {
 
     private JPanel backgroundPanel;
+    private final SaveManager saveManager = new SaveManager();
 
     public MainMenuUI() {
         setTitle("BurgerCity - Főmenü");
@@ -72,12 +77,45 @@ public class MainMenuUI extends JFrame {
         loadGameButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                JOptionPane.showMessageDialog(
-                        MainMenuUI.this,
-                        "A mentett játék indítása még nem került implementálásra.",
-                        "Hamarosan...",
-                        JOptionPane.INFORMATION_MESSAGE
-                );
+                try {
+                    java.util.List<SaveGame> saves = saveManager.listSaves();
+                    if (saves.isEmpty()) {
+                        JOptionPane.showMessageDialog(
+                                MainMenuUI.this,
+                                "Nincs elérhető mentés.",
+                                "Betöltés",
+                                JOptionPane.INFORMATION_MESSAGE
+                        );
+                        return;
+                    }
+
+                    SaveGame selected = (SaveGame) JOptionPane.showInputDialog(
+                            MainMenuUI.this,
+                            "Válassz mentést:",
+                            "Mentett játék indítása",
+                            JOptionPane.PLAIN_MESSAGE,
+                            null,
+                            saves.toArray(),
+                            saves.get(0)
+                    );
+
+                    if (selected == null) return;
+
+                    GameSnapshot snapshot = saveManager.loadSnapshot(selected);
+                    dispose();
+                    SwingUtilities.invokeLater(() -> {
+                        GameUI gameUI = new GameUI(snapshot);
+                        gameUI.setVisible(true);
+                    });
+
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(
+                            MainMenuUI.this,
+                            "Betöltés sikertelen: " + ex.getMessage(),
+                            "Hiba",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                }
             }
         });
 

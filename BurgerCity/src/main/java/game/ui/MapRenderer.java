@@ -28,6 +28,7 @@ public class MapRenderer extends JPanel {
     private List<game.building.TrafficLight> trafficLights = List.of();
     private BufferedImage grassTexture;
     private BufferedImage grassLayerCache;
+    private TexturePaint grassBackgroundPaint;
     private BufferedImage cityTexture;
     private BufferedImage truckTexture;
     private BufferedImage busTexture;
@@ -76,6 +77,8 @@ public class MapRenderer extends JPanel {
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g.drawImage(originalGrass, 0, 0, TILE_SIZE, TILE_SIZE, null);
             g.dispose();
+
+            grassBackgroundPaint = new TexturePaint(grassTexture, new Rectangle(0, 0, TILE_SIZE, TILE_SIZE));
 
             // Cache: előre rendereljük az összes fű tile-t egy nagy képbe
             buildGrassLayerCache();
@@ -172,7 +175,7 @@ public class MapRenderer extends JPanel {
             pattyPlantTexture = null;
         }
 
-        setBackground(Color.BLACK);
+        setBackground(tileColors.getOrDefault(TileType.GRASS, Color.DARK_GRAY));
 
         // Kamera inicializálása
         int worldWidth = map.getWidth() * TILE_SIZE;
@@ -226,6 +229,23 @@ public class MapRenderer extends JPanel {
         double scaledCameraX = cameraX / zoom;
         double scaledCameraY = cameraY / zoom;
         g2.translate(-scaledCameraX, -scaledCameraY);
+
+        // Fill the visible world area with a grass pattern.
+        // This is intentionally done AFTER applying the camera transform so the texture scrolls with the map.
+        int viewWorldW = (int) Math.ceil(getWidth() / zoom) + TILE_SIZE * 2;
+        int viewWorldH = (int) Math.ceil(getHeight() / zoom) + TILE_SIZE * 2;
+        int fillX = (int) Math.floor(scaledCameraX) - TILE_SIZE;
+        int fillY = (int) Math.floor(scaledCameraY) - TILE_SIZE;
+
+        if (grassBackgroundPaint != null) {
+            Paint oldPaint = g2.getPaint();
+            g2.setPaint(grassBackgroundPaint);
+            g2.fillRect(fillX, fillY, viewWorldW, viewWorldH);
+            g2.setPaint(oldPaint);
+        } else {
+            g2.setColor(tileColors.getOrDefault(TileType.GRASS, getBackground()));
+            g2.fillRect(fillX, fillY, viewWorldW, viewWorldH);
+        }
 
         // Csak a látható területet rajzoljuk ki
         int startX = Math.max(0, (int) (scaledCameraX / TILE_SIZE) - 1);

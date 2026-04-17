@@ -36,6 +36,16 @@ public class TimeManager {
         this.accumulatedGameTime = 0.0;
     }
 
+    /**
+     * Restores time-related state from a save.
+     */
+    public void restore(TimeSpeed speed, long totalTicks, double accumulatedGameTimeSeconds) {
+        if (speed == null) speed = TimeSpeed.NORMAL;
+        this.currentSpeed = speed;
+        this.totalTicks = Math.max(0, totalTicks);
+        this.accumulatedGameTime = Math.max(0.0, accumulatedGameTimeSeconds);
+    }
+
     //Updates the game time based on real delta time and current speed multiplier.
     public double update(double realDeltaSeconds) {
         double gameDelta = realDeltaSeconds * currentSpeed.getMultiplier();
