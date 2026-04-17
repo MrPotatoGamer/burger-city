@@ -26,6 +26,14 @@ public class Map {
         this.tiles = new Tile[width][height];
     }
 
+    /**
+     * Initializes all tiles to GRASS. Intended for save/load reconstruction.
+     * (The normal game flow uses {@link #loadPredefined()}.)
+     */
+    public void initGrassForLoad() {
+        initGrass();
+    }
+
     /** Előre definiált térkép betöltése */
     public void loadPredefined() {
         initGrass();
@@ -59,6 +67,14 @@ public class Map {
         }
     }
 
+    /**
+     * Adds a city and marks its footprint on the tile grid.
+     * Public for save/load reconstruction.
+     */
+    public void addCityForLoad(City city) {
+        addCity(city);
+    }
+
     private void addIndustry(Industry industry) {
         industries.add(industry);
         for (int x = industry.getOriginX(); x < industry.getOriginX() + industry.getWidth(); x++) {
@@ -70,6 +86,14 @@ public class Map {
                 }
             }
         }
+    }
+
+    /**
+     * Adds an industry and marks its footprint on the tile grid.
+     * Public for save/load reconstruction.
+     */
+    public void addIndustryForLoad(Industry industry) {
+        addIndustry(industry);
     }
 
     /**
