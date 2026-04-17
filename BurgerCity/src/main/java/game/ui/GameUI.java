@@ -838,6 +838,7 @@ public class GameUI extends JFrame {
 
         // Check traffic lights
         for (TrafficLight light : trafficLights) {
+
             if (light != null && light.getX() == tileX && light.getY() == tileY) {
                 showTrafficLightSettings(light);
                 updateStatus("Configuring traffic light at (" + tileX + ", " + tileY + ")");
