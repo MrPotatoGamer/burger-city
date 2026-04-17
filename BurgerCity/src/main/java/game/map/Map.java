@@ -44,6 +44,117 @@ public class Map {
         addCity(new City("Wheat Valley", 5, 28, 7, 6));        // Középméretű város lent balra
         addCity(new City("Factory District", 40, 30, 5, 5));   // Ipari város jobb alsó sarokban
         addCity(new City("Green Hills", 20, 15, 6, 5));        // Középső város
+
+        // Random erdők minden új játékindításkor (2-3 összefüggő, szabálytalan folt)
+        spawnRandomForests();
+    }
+
+    private void spawnRandomForests() {
+        Random rng = new Random(System.nanoTime());
+        int forestPatches = 5 + rng.nextInt(6); // 5..10
+
+        for (int i = 0; i < forestPatches; i++) {
+            int attempts = 900;
+            int seedX = -1;
+            int seedY = -1;
+
+            while (attempts-- > 0) {
+                int x = rng.nextInt(width);
+                int y = rng.nextInt(height);
+                if (!canPlaceForestAt(x, y)) continue;
+                // Keep patches separated so we typically get 2-3 distinct clusters.
+                if (hasNearbyForest(x, y, 2)) continue;
+                // Avoid hugging the very edge (helps the patch grow to an irregular shape)
+                if (x < 1 || y < 1 || x > width - 2 || y > height - 2) continue;
+                seedX = x;
+                seedY = y;
+                break;
+            }
+
+            if (seedX == -1) continue;
+
+            int targetSize = 20 + rng.nextInt(31); // 20..50 tiles
+            growForestPatch(seedX, seedY, targetSize, rng);
+        }
+    }
+
+    private boolean hasNearbyForest(int x, int y, int radius) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                if (dx == 0 && dy == 0) continue;
+                int nx = x + dx;
+                int ny = y + dy;
+                if (!inBounds(nx, ny)) continue;
+                Tile t = getTile(nx, ny);
+                if (t != null && t.getType() == TileType.FOREST) return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean canPlaceForestAt(int x, int y) {
+        if (!inBounds(x, y)) return false;
+        Tile t = getTile(x, y);
+        if (t == null) return false;
+        return t.getType() == TileType.GRASS && !t.isOccupied();
+    }
+
+    private void setForestAt(int x, int y) {
+        Tile t = getTile(x, y);
+        if (t == null) return;
+        t.setType(TileType.FOREST);
+        t.setWalkable(false);
+        t.setOccupied(true);
+    }
+
+    private void growForestPatch(int seedX, int seedY, int targetSize, Random rng) {
+        // Connected patch growth: always expand from an already-placed forest tile.
+        List<int[]> forestTiles = new ArrayList<>();
+        List<int[]> frontier = new ArrayList<>();
+
+        setForestAt(seedX, seedY);
+        forestTiles.add(new int[]{seedX, seedY});
+        frontier.add(new int[]{seedX, seedY});
+
+        int guard = 0;
+        while (forestTiles.size() < targetSize && !frontier.isEmpty() && guard++ < targetSize * 40) {
+            // Pick a base tile; using the frontier keeps patches blobby, but we randomize for irregularity.
+            int[] base = (rng.nextInt(100) < 70)
+                    ? frontier.get(rng.nextInt(frontier.size()))
+                    : forestTiles.get(rng.nextInt(forestTiles.size()));
+
+            boolean placed = false;
+            for (int tries = 0; tries < 8; tries++) {
+                int dir = rng.nextInt(4);
+                int nx = base[0];
+                int ny = base[1];
+                if (dir == 0) nx++;
+                else if (dir == 1) nx--;
+                else if (dir == 2) ny++;
+                else ny--;
+
+                if (!canPlaceForestAt(nx, ny)) continue;
+
+                setForestAt(nx, ny);
+                int[] added = new int[]{nx, ny};
+                forestTiles.add(added);
+                frontier.add(added);
+                placed = true;
+                break;
+            }
+
+            if (!placed) {
+                // If we can't expand from this edge anymore, drop some frontier tiles.
+                if (!frontier.isEmpty() && rng.nextInt(100) < 40) {
+                    frontier.remove(rng.nextInt(frontier.size()));
+                }
+            } else {
+                // Occasionally trim frontier to create holes/indentations for a more irregular silhouette.
+                if (!frontier.isEmpty() && rng.nextInt(100) < 15) {
+                    frontier.remove(rng.nextInt(frontier.size()));
+                }
+            }
+        }
     }
 
     private void initGrass() {

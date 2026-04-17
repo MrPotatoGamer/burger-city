@@ -37,6 +37,7 @@ public class MapRenderer extends JPanel {
     private BufferedImage burgerFactoryTexture;
     private BufferedImage ranchTexture;
     private BufferedImage pattyPlantTexture;
+    private BufferedImage treeTexture;
 
     private static BufferedImage loadImageResource(String resourcePath) throws IOException {
         try (InputStream inputStream = MapRenderer.class.getResourceAsStream(resourcePath)) {
@@ -56,6 +57,7 @@ public class MapRenderer extends JPanel {
         this.map = map;
 
         tileColors.put(TileType.GRASS,    new Color(100, 180, 80));
+        tileColors.put(TileType.FOREST,   new Color(60, 140, 70));
         tileColors.put(TileType.CITY,     new Color(180, 180, 180));
         tileColors.put(TileType.INDUSTRY, new Color(200, 140, 60));
         tileColors.put(TileType.ROAD,     new Color(80, 80, 80));
@@ -175,6 +177,19 @@ public class MapRenderer extends JPanel {
             pattyPlantTexture = null;
         }
 
+        // Tree textúra betöltése (forest overlay)
+        try {
+            BufferedImage originalTree = loadImageResource("/game/assets/tree1.png");
+            treeTexture = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = treeTexture.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(originalTree, 0, 0, TILE_SIZE, TILE_SIZE, null);
+            g.dispose();
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni a tree textúrát: " + e.getMessage());
+            treeTexture = null;
+        }
+
         setBackground(tileColors.getOrDefault(TileType.GRASS, Color.DARK_GRAY));
 
         // Kamera inicializálása
@@ -267,6 +282,21 @@ public class MapRenderer extends JPanel {
                 if (tile.getType() == TileType.ROAD) {
                     // Speciális útrajzolás
                     drawRoad(g2, x, y);
+                } else if (tile.getType() == TileType.FOREST) {
+                    // Forest: grass base + tree overlay
+                    int px = x * TILE_SIZE;
+                    int py = y * TILE_SIZE;
+
+                    if (grassTexture != null) {
+                        g2.drawImage(grassTexture, px, py, null);
+                    } else {
+                        g2.setColor(tileColors.getOrDefault(TileType.GRASS, getBackground()));
+                        g2.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    }
+
+                    if (treeTexture != null) {
+                        g2.drawImage(treeTexture, px, py, null);
+                    }
                 } else if (tile.getType() == TileType.GRASS) {
                     // Fű tile-ok át lesznek ugorva, mert egy cache réteget rajzolunk
                 } else if (tile.getType() == TileType.CITY) {
