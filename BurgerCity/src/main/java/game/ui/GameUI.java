@@ -521,11 +521,13 @@ public class GameUI extends JFrame {
         // Special validation for Traffic Light: must be on ROAD intersection
         if (selectedBuildableBuilding == BuildableBuilding.TRAFFIC_LIGHT) {
             if (targetTile.getType() != TileType.ROAD) {
-                updateStatus("Közlekedési lámpa csak útra építhető!");
+                updateStatus("Traffic Lights can only be built on roads!");
                 return;
             }
-            if (targetTile.isOccupied() && targetTile.getType() != TileType.ROAD) {
-                updateStatus("Ez a mező foglalt (már van lámpa), ide nem lehet építeni.");
+            boolean alreadyHasLight = trafficLights.stream()
+                    .anyMatch(tl -> tl.getX() == tileX && tl.getY() == tileY);
+            if (alreadyHasLight) {
+                updateStatus("There is already a Traffic Light here!");
                 return;
             }
             // Intersection check will be done in map.buildBuilding()
