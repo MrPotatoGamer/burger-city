@@ -11,8 +11,8 @@ import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 
@@ -37,6 +37,20 @@ public class MapRenderer extends JPanel {
     private BufferedImage ranchTexture;
     private BufferedImage pattyPlantTexture;
 
+    private static BufferedImage loadImageResource(String resourcePath) throws IOException {
+        try (InputStream inputStream = MapRenderer.class.getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                throw new IOException("Resource not found on classpath: " + resourcePath);
+            }
+
+            BufferedImage image = ImageIO.read(inputStream);
+            if (image == null) {
+                throw new IOException("Unsupported or unreadable image: " + resourcePath);
+            }
+            return image;
+        }
+    }
+
     public MapRenderer(game.map.Map map) {
         this.map = map;
 
@@ -55,7 +69,7 @@ public class MapRenderer extends JPanel {
 
         // Fű textúra betöltése és előre skálázása
         try {
-            BufferedImage originalGrass = ImageIO.read(new File("src/main/java/game/assets/grass.png"));
+            BufferedImage originalGrass = loadImageResource("/game/assets/grass.png");
             // Előre skálázzuk a textúrát TILE_SIZE-ra
             grassTexture = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_RGB);
             Graphics2D g = grassTexture.createGraphics();
@@ -73,7 +87,7 @@ public class MapRenderer extends JPanel {
 
         // City textúra betöltése és előre skálázása
         try {
-            BufferedImage originalCity = ImageIO.read(new File("src/main/java/game/assets/city.png"));
+            BufferedImage originalCity = loadImageResource("/game/assets/city.png");
             // Előre skálázzuk TILE_SIZE-ra
             cityTexture = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = cityTexture.createGraphics();
@@ -87,7 +101,7 @@ public class MapRenderer extends JPanel {
 
         // Truck textúra betöltése és előre skálázása
         try {
-            BufferedImage originalTruck = ImageIO.read(new File("src/main/java/game/assets/truck.png"));
+            BufferedImage originalTruck = loadImageResource("/game/assets/truck.png");
             int vehicleSize = TILE_SIZE;
             truckTexture = new BufferedImage(vehicleSize, vehicleSize, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = truckTexture.createGraphics();
@@ -101,7 +115,7 @@ public class MapRenderer extends JPanel {
 
         // Bus textúra betöltése és előre skálázása
         try {
-            BufferedImage originalBus = ImageIO.read(new File("src/main/java/game/assets/bus.png"));
+            BufferedImage originalBus = loadImageResource("/game/assets/bus.png");
             int vehicleSize = TILE_SIZE;
             busTexture = new BufferedImage(vehicleSize, vehicleSize, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = busTexture.createGraphics();
@@ -115,7 +129,7 @@ public class MapRenderer extends JPanel {
 
         // Wheat textúra betöltése és előre skálázása
         try {
-            BufferedImage originalWheat = ImageIO.read(new File("src/main/java/game/assets/wheat.png"));
+            BufferedImage originalWheat = loadImageResource("/game/assets/wheat.png");
             wheatTexture = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = wheatTexture.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -128,7 +142,7 @@ public class MapRenderer extends JPanel {
 
         // Bakery textúra betöltése
         try {
-            bakeryTexture = ImageIO.read(new File("src/main/java/game/assets/bakery.png"));
+            bakeryTexture = loadImageResource("/game/assets/bakery.png");
         } catch (IOException e) {
             System.err.println("Nem sikerült betölteni a bakery textúrát: " + e.getMessage());
             bakeryTexture = null;
@@ -136,7 +150,7 @@ public class MapRenderer extends JPanel {
 
         // Burger Factory textúra betöltése
         try {
-            burgerFactoryTexture = ImageIO.read(new File("src/main/java/game/assets/burger_factory.png"));
+            burgerFactoryTexture = loadImageResource("/game/assets/burger_factory.png");
         } catch (IOException e) {
             System.err.println("Nem sikerült betölteni a burger_factory textúrát: " + e.getMessage());
             burgerFactoryTexture = null;
@@ -144,7 +158,7 @@ public class MapRenderer extends JPanel {
 
         // Ranch textúra betöltése
         try {
-            ranchTexture = ImageIO.read(new File("src/main/java/game/assets/ranch.jpg"));
+            ranchTexture = loadImageResource("/game/assets/ranch.jpg");
         } catch (IOException e) {
             System.err.println("Nem sikerült betölteni a ranch textúrát: " + e.getMessage());
             ranchTexture = null;
@@ -152,7 +166,7 @@ public class MapRenderer extends JPanel {
 
         // Patty Plant textúra betöltése
         try {
-            pattyPlantTexture = ImageIO.read(new File("src/main/java/game/assets/patty_plant.png"));
+            pattyPlantTexture = loadImageResource("/game/assets/patty_plant.png");
         } catch (IOException e) {
             System.err.println("Nem sikerült betölteni a patty_plant textúrát: " + e.getMessage());
             pattyPlantTexture = null;

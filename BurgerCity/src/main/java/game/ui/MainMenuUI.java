@@ -4,7 +4,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
 
 public class MainMenuUI extends JFrame {
 
@@ -23,7 +22,11 @@ public class MainMenuUI extends JFrame {
 
             {
                 try {
-                    backgroundImage = new ImageIcon("src/main/java/game/assets/main_menu_bg.png").getImage();
+                    var backgroundUrl = MainMenuUI.class.getResource("/game/assets/main_menu_bg.png");
+                    if (backgroundUrl == null) {
+                        throw new IllegalStateException("Resource not found on classpath: /game/assets/main_menu_bg.png");
+                    }
+                    backgroundImage = new ImageIcon(backgroundUrl).getImage();
                 } catch (Exception e) {
                     System.err.println("A háttérkép betöltése nem sikerült: " + e.getMessage());
                 }
