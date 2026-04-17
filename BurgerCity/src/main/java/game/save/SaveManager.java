@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -88,7 +89,10 @@ public class SaveManager {
         long now = System.currentTimeMillis();
         String id = UUID.randomUUID().toString();
         String safeName = sanitizeFileComponent(saveName);
-        String stamp = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").withLocale(Locale.ROOT).format(Instant.ofEpochMilli(now));
+        String stamp = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+            .withLocale(Locale.ROOT)
+            .withZone(ZoneId.systemDefault())
+            .format(Instant.ofEpochMilli(now));
         String fileName = stamp + "_" + safeName + "_" + id.substring(0, 8) + ".json";
         Path path = savesDir.resolve(fileName);
 
