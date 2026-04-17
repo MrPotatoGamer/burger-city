@@ -235,7 +235,25 @@ public class Map {
         tile.setType(TileType.GRASS);
         tile.setWalkable(true);
         tile.setOccupied(false);
+        tile.setPlacedBuilding(null); // Remove any traffic light
         return true;
+    }
+
+    /**
+     * Check if a traffic light at (x, y) is still valid.
+     * A traffic light is valid if:
+     * - The tile is ROAD
+     * - The tile has at least 3 road neighbors (intersection)
+     */
+    public boolean isTrafficLightValid(int x, int y) {
+        if (!inBounds(x, y)) return false;
+        Tile tile = getTile(x, y);
+        if (tile == null) return false;
+        if (tile.getType() != TileType.ROAD) return false;
+
+        // Check if it's still an intersection
+        int roadNeighbors = countRoadNeighbors(x, y);
+        return roadNeighbors >= 3;
     }
 
     /**

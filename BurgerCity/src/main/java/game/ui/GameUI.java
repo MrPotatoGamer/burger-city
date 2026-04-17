@@ -969,6 +969,9 @@ public class GameUI extends JFrame {
         if (!timeManager.isPaused()) {
             map.updateEconomy(gameDeltaSeconds);
 
+            // Check and remove invalid traffic lights
+            removeInvalidTrafficLights();
+
             // Update traffic lights
             for (TrafficLight light : trafficLights) {
                 if (light != null) light.update(gameDeltaSeconds);
@@ -1000,6 +1003,42 @@ public class GameUI extends JFrame {
     private void updateStatus(String message) {
         lastStatusMessage = message;
         statusBar.setText(" " + lastStatusMessage + " | Pénz: " + player.getMoney() + "$");
+    }
+
+    /**
+     * Remove traffic lights that are no longer valid.
+     * A traffic light is invalid if:
+     * - The tile is no longer ROAD
+     * - The tile is no longer an intersection (< 3 road neighbors)
+     */
+    private void removeInvalidTrafficLights() {
+        List<TrafficLight> toRemove = new ArrayList<>();
+
+        for (TrafficLight light : trafficLights) {
+            if (light == null) continue;
+
+            if (!map.isTrafficLightValid(light.getX(), light.getY())) {
+                toRemove.add(light);
+
+                // Clear the tile
+                Tile tile = map.getTile(light.getX(), light.getY());
+                if (tile != null) {
+                    tile.setOccupied(false);
+                    tile.setPlacedBuilding(null);
+                }
+            }
+        }
+
+        if (!toRemove.isEmpty()) {
+            trafficLights.removeAll(toRemove);
+            mapRenderer.setTrafficLights(trafficLights);
+
+            if (toRemove.size() == 1) {
+                updateStatus("Traffic light removed (no longer at intersection)");
+            } else {
+                updateStatus(toRemove.size() + " traffic lights removed (no longer at intersections)");
+            }
+        }
     }
 
     public static void main(String[] args) {
