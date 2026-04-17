@@ -149,7 +149,8 @@ public class Map {
 
     /**
      * Player-built building placement.
-     * Only allowed on unoccupied GRASS tiles.
+     * Most buildings only allowed on unoccupied GRASS tiles.
+     * TrafficLight is special: only allowed on ROAD intersections (3+ connections).
      */
     public boolean buildBuilding(int x, int y, Building building) {
         if (building == null) return false;
@@ -158,6 +159,22 @@ public class Map {
         Tile tile = getTile(x, y);
         if (tile == null) return false;
 
+        // Special case: TrafficLight can only be built on road intersections
+        if (building instanceof game.building.TrafficLight) {
+            if (tile.getType() != TileType.ROAD) return false;
+            if (tile.isOccupied() && tile.getType() != TileType.ROAD) return false; // Can't build if already has a traffic light
+
+            // Check if it's an intersection (3 or 4 road neighbors)
+            int roadNeighbors = countRoadNeighbors(x, y);
+            if (roadNeighbors < 3) return false; // Must be at least a 3-way intersection
+
+            // Don't change tile type - keep it as ROAD
+            tile.setOccupied(true);
+            tile.setPlacedBuilding(building);
+            return true;
+        }
+
+        // Regular buildings: only on grass
         if (tile.getType() != TileType.GRASS || tile.isOccupied()) return false;
 
         tile.setType(TileType.BUILDING);
@@ -165,6 +182,26 @@ public class Map {
         tile.setOccupied(true);
         tile.setPlacedBuilding(building);
         return true;
+    }
+
+    /**
+     * Count how many neighbors of a tile are ROAD or BUILDING (for road connectivity).
+     */
+    private int countRoadNeighbors(int x, int y) {
+        int count = 0;
+        if (isRoadOrBuilding(x, y - 1)) count++; // North
+        if (isRoadOrBuilding(x + 1, y)) count++; // East
+        if (isRoadOrBuilding(x, y + 1)) count++; // South
+        if (isRoadOrBuilding(x - 1, y)) count++; // West
+        return count;
+    }
+
+    private boolean isRoadOrBuilding(int x, int y) {
+        if (!inBounds(x, y)) return false;
+        Tile t = getTile(x, y);
+        if (t == null) return false;
+        TileType type = t.getType();
+        return type == TileType.ROAD || type == TileType.BUILDING;
     }
 
     /**
@@ -198,7 +235,25 @@ public class Map {
         tile.setType(TileType.GRASS);
         tile.setWalkable(true);
         tile.setOccupied(false);
+        tile.setPlacedBuilding(null); // Remove any traffic light
         return true;
+    }
+
+    /**
+     * Check if a traffic light at (x, y) is still valid.
+     * A traffic light is valid if:
+     * - The tile is ROAD
+     * - The tile has at least 3 road neighbors (intersection)
+     */
+    public boolean isTrafficLightValid(int x, int y) {
+        if (!inBounds(x, y)) return false;
+        Tile tile = getTile(x, y);
+        if (tile == null) return false;
+        if (tile.getType() != TileType.ROAD) return false;
+
+        // Check if it's still an intersection
+        int roadNeighbors = countRoadNeighbors(x, y);
+        return roadNeighbors >= 3;
     }
 
     /**

@@ -25,6 +25,7 @@ public class MapRenderer extends JPanel {
     private final java.util.Map<IndustryType, Color> industryColors = new HashMap<>();
     private Camera camera;
     private List<Vehicle> vehicles = List.of();
+    private List<game.building.TrafficLight> trafficLights = List.of();
     private BufferedImage grassTexture;
     private BufferedImage grassLayerCache;
     private BufferedImage cityTexture;
@@ -183,6 +184,11 @@ public class MapRenderer extends JPanel {
         repaint();
     }
 
+    public void setTrafficLights(List<game.building.TrafficLight> trafficLights) {
+        this.trafficLights = (trafficLights == null) ? List.of() : trafficLights;
+        repaint();
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -266,6 +272,12 @@ public class MapRenderer extends JPanel {
             drawIndustry(g2, ind);
         }
 
+        // Traffic lights kirajzolása
+        for (game.building.TrafficLight light : trafficLights) {
+            if (light == null) continue;
+            drawTrafficLight(g2, light);
+        }
+
         // Járművek kirajzolása
         int vehicleSize = TILE_SIZE / 2;
         for (Vehicle v : vehicles) {
@@ -295,6 +307,52 @@ public class MapRenderer extends JPanel {
                 g2.fillOval(vx, vy, vehicleSize, vehicleSize);
             }
         }
+    }
+
+    private void drawTrafficLight(Graphics2D g2, game.building.TrafficLight light) {
+        int x = light.getX();
+        int y = light.getY();
+        int px = x * TILE_SIZE;
+        int py = y * TILE_SIZE;
+
+        String state = light.getCurrentState();
+
+        // Draw small traffic light circles at corners
+        int circleSize = 8;
+        int offset = 4;
+
+        // North-South lights (main direction)
+        if (state.equals("MAIN_GREEN")) {
+            // North light (top)
+            g2.setColor(Color.GREEN);
+            g2.fillOval(px + TILE_SIZE/2 - circleSize/2, py + offset, circleSize, circleSize);
+            // South light (bottom)
+            g2.fillOval(px + TILE_SIZE/2 - circleSize/2, py + TILE_SIZE - offset - circleSize, circleSize, circleSize);
+        } else {
+            g2.setColor(Color.RED);
+            g2.fillOval(px + TILE_SIZE/2 - circleSize/2, py + offset, circleSize, circleSize);
+            g2.fillOval(px + TILE_SIZE/2 - circleSize/2, py + TILE_SIZE - offset - circleSize, circleSize, circleSize);
+        }
+
+        // East-West lights (cross direction)
+        if (state.equals("CROSS_GREEN")) {
+            g2.setColor(Color.GREEN);
+            // East light (right)
+            g2.fillOval(px + TILE_SIZE - offset - circleSize, py + TILE_SIZE/2 - circleSize/2, circleSize, circleSize);
+            // West light (left)
+            g2.fillOval(px + offset, py + TILE_SIZE/2 - circleSize/2, circleSize, circleSize);
+        } else {
+            g2.setColor(Color.RED);
+            g2.fillOval(px + TILE_SIZE - offset - circleSize, py + TILE_SIZE/2 - circleSize/2, circleSize, circleSize);
+            g2.fillOval(px + offset, py + TILE_SIZE/2 - circleSize/2, circleSize, circleSize);
+        }
+
+        // Draw black outline for better visibility
+        g2.setColor(Color.BLACK);
+        g2.drawOval(px + TILE_SIZE/2 - circleSize/2, py + offset, circleSize, circleSize);
+        g2.drawOval(px + TILE_SIZE/2 - circleSize/2, py + TILE_SIZE - offset - circleSize, circleSize, circleSize);
+        g2.drawOval(px + TILE_SIZE - offset - circleSize, py + TILE_SIZE/2 - circleSize/2, circleSize, circleSize);
+        g2.drawOval(px + offset, py + TILE_SIZE/2 - circleSize/2, circleSize, circleSize);
     }
 
     public void setMap(game.map.Map map) {

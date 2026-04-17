@@ -57,6 +57,7 @@ public class GameUI extends JFrame {
     }
 
     private final List<Vehicle> vehicles = new ArrayList<>();
+    private final List<TrafficLight> trafficLights = new ArrayList<>();
     private long lastTickNanos;
     private Timer gameTimer;
 
@@ -517,14 +518,30 @@ public class GameUI extends JFrame {
             return;
         }
 
-        if (targetTile.getType() != TileType.GRASS) {
-            updateStatus("Csak üres fű mezőre lehet épületet rakni! Aktuális: " + targetTile.getType() + ".");
-            return;
-        }
+        // Special validation for Traffic Light: must be on ROAD intersection
+        if (selectedBuildableBuilding == BuildableBuilding.TRAFFIC_LIGHT) {
+            if (targetTile.getType() != TileType.ROAD) {
+                updateStatus("Traffic Lights can only be built on roads!");
+                return;
+            }
+            boolean alreadyHasLight = trafficLights.stream()
+                    .anyMatch(tl -> tl.getX() == tileX && tl.getY() == tileY);
+            if (alreadyHasLight) {
+                updateStatus("There is already a Traffic Light here!");
+                return;
+            }
+            // Intersection check will be done in map.buildBuilding()
+        } else {
+            // Regular buildings: must be on GRASS
+            if (targetTile.getType() != TileType.GRASS) {
+                updateStatus("Csak üres fű mezőre lehet épületet rakni! Aktuális: " + targetTile.getType() + ".");
+                return;
+            }
 
-        if (targetTile.isOccupied()) {
-            updateStatus("Ez a mező foglalt, ide nem lehet építeni.");
-            return;
+            if (targetTile.isOccupied()) {
+                updateStatus("Ez a mező foglalt, ide nem lehet építeni.");
+                return;
+            }
         }
 
         if (!player.spendMoney(BUILDING_COST)) {
@@ -539,11 +556,20 @@ public class GameUI extends JFrame {
         };
 
         if (map.buildBuilding(tileX, tileY, building)) {
+            // Add traffic light to the list for updates
+            if (building instanceof TrafficLight) {
+                trafficLights.add((TrafficLight) building);
+                mapRenderer.setTrafficLights(trafficLights);
+            }
             mapRenderer.repaint();
             updateStatus("Épület sikeresen lerakva: " + building.getName() + " (" + tileX + ", " + tileY + "). Pénz: " + player.getMoney() + "$");
         } else {
             player.addMoney(BUILDING_COST);
-            updateStatus("Erre a mezőre nem építhető épület!");
+            if (building instanceof TrafficLight) {
+                updateStatus("Közlekedési lámpát csak kereszteződésre (3 vagy 4 utas) lehet építeni!");
+            } else {
+                updateStatus("Erre a mezőre nem építhető épület!");
+            }
         }
     }
 
@@ -636,6 +662,9 @@ public class GameUI extends JFrame {
         if (tile.getType() == TileType.INDUSTRY) {
             var ind = map.demolishIndustryAt(tileX, tileY);
             if (ind != null) {
+                // Remove vehicles serving this industry
+                removeVehiclesServingBuilding(ind.getOriginX(), ind.getOriginY());
+
                 int refund = INDUSTRY_COST / 2;
                 player.addMoney(refund);
                 mapRenderer.repaint();
@@ -732,6 +761,8 @@ public class GameUI extends JFrame {
 
         Vehicle v = (choice == 0) ? new Bus() : new Truck();
         v.setPath(path);
+        v.setRouteBuildings(startBuilding.originX(), startBuilding.originY(),
+                            endBuilding.originX(), endBuilding.originY());
         vehicles.add(v);
         mapRenderer.repaint();
         updateStatus("Jármű lehelyezve: " + options[choice] + " | Útvonal: " + startBuilding.name() + " -> " + endBuilding.name());
@@ -812,10 +843,112 @@ public class GameUI extends JFrame {
             }
         }
 
+        // Check traffic lights
+        for (TrafficLight light : trafficLights) {
+
+            if (light != null && light.getX() == tileX && light.getY() == tileY) {
+                showTrafficLightSettings(light);
+                updateStatus("Configuring traffic light at (" + tileX + ", " + tileY + ")");
+                return;
+            }
+        }
+
         // Clicked on empty space — clear inspection
         if (dashboard.hasInspection()) {
             dashboard.clearInspection();
             updateStatus("Mini Transport Tycoon | BurgerCity");
+        }
+    }
+
+    private void showTrafficLightSettings(TrafficLight light) {
+        JPanel panel = new JPanel(new BorderLayout(5, 5));
+
+        // Settings panel
+        JPanel settingsPanel = new JPanel(new GridLayout(2, 2, 5, 5));
+
+        JLabel mainLabel = new JLabel("North-South (Main) duration (sec):");
+        JTextField mainField = new JTextField(String.valueOf((int)light.getGreenDurationMain()));
+
+        JLabel crossLabel = new JLabel("East-West (Cross) duration (sec):");
+        JTextField crossField = new JTextField(String.valueOf((int)light.getGreenDurationCross()));
+
+        settingsPanel.add(mainLabel);
+        settingsPanel.add(mainField);
+        settingsPanel.add(crossLabel);
+        settingsPanel.add(crossField);
+
+        // Delete button
+        JButton deleteButton = new JButton("Delete Traffic Light");
+        deleteButton.setForeground(Color.RED);
+
+        panel.add(settingsPanel, BorderLayout.CENTER);
+        panel.add(deleteButton, BorderLayout.SOUTH);
+
+        // Custom dialog with options
+        Object[] options = {"Save", "Cancel"};
+        final boolean[] deleted = {false};
+
+        deleteButton.addActionListener(e -> {
+            int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Are you sure you want to delete this traffic light?",
+                "Confirm Delete",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+            );
+
+            if (confirm == JOptionPane.YES_OPTION) {
+                // Remove from list
+                trafficLights.remove(light);
+                mapRenderer.setTrafficLights(trafficLights);
+
+                // Remove from map tile
+                Tile tile = map.getTile(light.getX(), light.getY());
+                if (tile != null) {
+                    tile.setOccupied(false);
+                    tile.setPlacedBuilding(null);
+                }
+
+                mapRenderer.repaint();
+                updateStatus("Traffic light deleted at (" + light.getX() + ", " + light.getY() + ")");
+                deleted[0] = true;
+
+                // Close the settings dialog
+                Window window = SwingUtilities.getWindowAncestor(panel);
+                if (window != null) {
+                    window.dispose();
+                }
+            }
+        });
+
+        int result = JOptionPane.showOptionDialog(
+            this,
+            panel,
+            "Traffic Light Settings at (" + light.getX() + ", " + light.getY() + ")",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.PLAIN_MESSAGE,
+            null,
+            options,
+            options[0]
+        );
+
+        // Only update settings if not deleted and user clicked Save
+        if (!deleted[0] && result == JOptionPane.OK_OPTION) {
+            try {
+                double mainDuration = Double.parseDouble(mainField.getText());
+                double crossDuration = Double.parseDouble(crossField.getText());
+
+                if (mainDuration < 1 || crossDuration < 1) {
+                    JOptionPane.showMessageDialog(this, "Durations must be at least 1 second!");
+                    return;
+                }
+
+                light.setDurations(mainDuration, crossDuration);
+                updateStatus("Traffic light settings updated: Main=" + mainDuration + "s, Cross=" + crossDuration + "s");
+
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Invalid number format!");
+            }
         }
     }
 
@@ -841,9 +974,17 @@ public class GameUI extends JFrame {
         if (!timeManager.isPaused()) {
             map.updateEconomy(gameDeltaSeconds);
 
+            // Check and remove invalid traffic lights
+            removeInvalidTrafficLights();
+
+            // Update traffic lights
+            for (TrafficLight light : trafficLights) {
+                if (light != null) light.update(gameDeltaSeconds);
+            }
+
             for (Vehicle v : vehicles) {
                 if (v == null) continue;
-                v.update(map, gameDeltaSeconds);
+                v.update(map, gameDeltaSeconds, vehicles, trafficLights);
                 v.processArrivalEconomy(map, player);
             }
         }
@@ -867,6 +1008,67 @@ public class GameUI extends JFrame {
     private void updateStatus(String message) {
         lastStatusMessage = message;
         statusBar.setText(" " + lastStatusMessage + " | Pénz: " + player.getMoney() + "$");
+    }
+
+    /**
+     * Remove traffic lights that are no longer valid.
+     * A traffic light is invalid if:
+     * - The tile is no longer ROAD
+     * - The tile is no longer an intersection (< 3 road neighbors)
+     */
+    private void removeInvalidTrafficLights() {
+        List<TrafficLight> toRemove = new ArrayList<>();
+
+        for (TrafficLight light : trafficLights) {
+            if (light == null) continue;
+
+            if (!map.isTrafficLightValid(light.getX(), light.getY())) {
+                toRemove.add(light);
+
+                // Clear the tile
+                Tile tile = map.getTile(light.getX(), light.getY());
+                if (tile != null) {
+                    tile.setOccupied(false);
+                    tile.setPlacedBuilding(null);
+                }
+            }
+        }
+
+        if (!toRemove.isEmpty()) {
+            trafficLights.removeAll(toRemove);
+            mapRenderer.setTrafficLights(trafficLights);
+
+            if (toRemove.size() == 1) {
+                updateStatus("Traffic light removed (no longer at intersection)");
+            } else {
+                updateStatus(toRemove.size() + " traffic lights removed (no longer at intersections)");
+            }
+        }
+    }
+
+    /**
+     * Remove all vehicles that serve a building at the given origin coordinates.
+     * Called when a City or Industry is demolished.
+     */
+    public void removeVehiclesServingBuilding(int originX, int originY) {
+        List<Vehicle> toRemove = new ArrayList<>();
+
+        for (Vehicle v : vehicles) {
+            if (v != null && v.servesBuilding(originX, originY)) {
+                toRemove.add(v);
+            }
+        }
+
+        if (!toRemove.isEmpty()) {
+            vehicles.removeAll(toRemove);
+            mapRenderer.setVehicles(vehicles);
+
+            if (toRemove.size() == 1) {
+                updateStatus("1 vehicle removed (building destroyed)");
+            } else {
+                updateStatus(toRemove.size() + " vehicles removed (building destroyed)");
+            }
+        }
     }
 
     public static void main(String[] args) {

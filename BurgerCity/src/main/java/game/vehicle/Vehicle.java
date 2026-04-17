@@ -30,6 +30,12 @@ public class Vehicle {
     protected Resource currentCargo;
     protected Garage garage;
 
+    // Store the buildings this vehicle serves (for cleanup when building is destroyed)
+    protected Integer startBuildingOriginX;
+    protected Integer startBuildingOriginY;
+    protected Integer endBuildingOriginX;
+    protected Integer endBuildingOriginY;
+
     // World-position (pixel) coordinates, centered on tiles
     protected double worldX;
     protected double worldY;
@@ -53,9 +59,18 @@ public class Vehicle {
 
     private boolean arrivedThisUpdate = false;
 
+    // Traffic management: direction on current tile (0=none, 1=N, 2=E, 3=S, 4=W)
+    protected int currentDirection = 0;
+    // Effective speed considering traffic ahead
+    protected double effectiveSpeed;
+    // Track when this vehicle started approaching an intersection
+    protected Integer intersectionClaimX = null;
+    protected Integer intersectionClaimY = null;
+
     public Vehicle() {
         // Interpreted as tiles per second (converted internally to pixels/sec)
         this.speed = 2;
+        this.effectiveSpeed = this.speed;
     }
 
     public double getWorldX() {
@@ -87,6 +102,9 @@ public class Vehicle {
         this.previousTileY = null;
         this.lastMoveDx = 0;
         this.lastMoveDy = 0;
+        this.currentDirection = 0;
+        this.intersectionClaimX = null;
+        this.intersectionClaimY = null;
         this.worldX = tileCenterX(tileX);
         this.worldY = tileCenterY(tileY);
     }
@@ -116,6 +134,37 @@ public class Vehicle {
         return pathTiles != null && !pathTiles.isEmpty();
     }
 
+    /**
+     * Set the buildings this vehicle serves (for tracking when buildings are destroyed).
+     * @param startOriginX Origin X of start building
+     * @param startOriginY Origin Y of start building
+     * @param endOriginX Origin X of end building
+     * @param endOriginY Origin Y of end building
+     */
+    public void setRouteBuildings(int startOriginX, int startOriginY, int endOriginX, int endOriginY) {
+        this.startBuildingOriginX = startOriginX;
+        this.startBuildingOriginY = startOriginY;
+        this.endBuildingOriginX = endOriginX;
+        this.endBuildingOriginY = endOriginY;
+    }
+
+    /**
+     * Check if this vehicle serves a building at the given origin coordinates.
+     */
+    public boolean servesBuilding(int originX, int originY) {
+        if (startBuildingOriginX != null && startBuildingOriginY != null) {
+            if (startBuildingOriginX == originX && startBuildingOriginY == originY) {
+                return true;
+            }
+        }
+        if (endBuildingOriginX != null && endBuildingOriginY != null) {
+            if (endBuildingOriginX == originX && endBuildingOriginY == originY) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public Resource getCurrentCargo() {
         return currentCargo;
     }
@@ -126,6 +175,27 @@ public class Vehicle {
      * @param deltaSeconds Time elapsed since last update.
      */
     public void update(Map map, double deltaSeconds) {
+        update(map, deltaSeconds, null, null);
+    }
+
+    /**
+     * Move along connected ROAD tiles with traffic awareness.
+     * @param map The game map.
+     * @param deltaSeconds Time elapsed since last update.
+     * @param allVehicles All vehicles in the game for traffic checking (can be null).
+     */
+    public void update(Map map, double deltaSeconds, List<Vehicle> allVehicles) {
+        update(map, deltaSeconds, allVehicles, null);
+    }
+
+    /**
+     * Move along connected ROAD tiles with traffic awareness and traffic lights.
+     * @param map The game map.
+     * @param deltaSeconds Time elapsed since last update.
+     * @param allVehicles All vehicles in the game for traffic checking (can be null).
+     * @param trafficLights All traffic lights in the game (can be null).
+     */
+    public void update(Map map, double deltaSeconds, List<Vehicle> allVehicles, List<game.building.TrafficLight> trafficLights) {
         Objects.requireNonNull(map, "map");
         if (deltaSeconds <= 0) return;
 
@@ -134,9 +204,12 @@ public class Vehicle {
 
         // If we don't have a target yet, try to acquire one.
         if (targetTileX == null || targetTileY == null) {
-            chooseNextTarget(map);
+            chooseNextTarget(map, allVehicles, trafficLights);
             return;
         }
+
+        // Adjust speed based on traffic ahead
+        adjustSpeedForTraffic(allVehicles);
 
         double targetX = tileCenterX(targetTileX);
         double targetY = tileCenterY(targetTileY);
@@ -146,21 +219,54 @@ public class Vehicle {
 
         // Arrived (snap).
         if (dist < 0.01) {
-            arriveAtTarget(map);
+            arriveAtTarget(map, allVehicles, trafficLights);
             return;
         }
 
-        double pixelsPerSecond = speed * (double) TILE_SIZE_PX;
+        double pixelsPerSecond = effectiveSpeed * (double) TILE_SIZE_PX;
         double step = pixelsPerSecond * deltaSeconds;
         if (step >= dist) {
             worldX = targetX;
             worldY = targetY;
-            arriveAtTarget(map);
+            arriveAtTarget(map, allVehicles, trafficLights);
             return;
         }
 
         worldX += (dx / dist) * step;
         worldY += (dy / dist) * step;
+    }
+
+    /**
+     * Adjust effective speed based on vehicles ahead in the same direction.
+     * If another vehicle is on our target tile in the same direction, we MUST STOP (no overtaking).
+     */
+    protected void adjustSpeedForTraffic(List<Vehicle> allVehicles) {
+        effectiveSpeed = speed; // Reset to base speed each tick
+
+        if (allVehicles == null || targetTileX == null || targetTileY == null) return;
+
+        // Calculate our planned direction
+        int myPlannedDirection = getPlannedDirection(targetTileX, targetTileY);
+        if (myPlannedDirection == 0) myPlannedDirection = currentDirection;
+
+        for (Vehicle other : allVehicles) {
+            if (other == this) continue;
+            if (!other.isSpawned()) continue;
+
+            // Determine other vehicle's direction
+            int otherDirection = other.currentDirection;
+            if (otherDirection == 0 && other.targetTileX != null && other.targetTileY != null) {
+                otherDirection = other.getPlannedDirection(other.targetTileX, other.targetTileY);
+            }
+
+            // If other is on our target tile in the same direction, we MUST STOP
+            if (other.currentTileX == targetTileX && other.currentTileY == targetTileY) {
+                if (otherDirection == myPlannedDirection && otherDirection != 0) {
+                    effectiveSpeed = 0; // STOP - cannot overtake
+                    return;
+                }
+            }
+        }
     }
 
     /**
@@ -211,6 +317,14 @@ public class Vehicle {
     }
 
     protected void arriveAtTarget(Map map) {
+        arriveAtTarget(map, null, null);
+    }
+
+    protected void arriveAtTarget(Map map, List<Vehicle> allVehicles) {
+        arriveAtTarget(map, allVehicles, null);
+    }
+
+    protected void arriveAtTarget(Map map, List<Vehicle> allVehicles, List<game.building.TrafficLight> trafficLights) {
         if (targetTileX == null || targetTileY == null) return;
         previousTileX = currentTileX;
         previousTileY = currentTileY;
@@ -225,11 +339,39 @@ public class Vehicle {
         targetTileX = null;
         targetTileY = null;
 
+        // Update direction based on movement
+        updateDirection();
+
+        // Clear intersection claim if we're leaving it
+        if (intersectionClaimX != null && intersectionClaimY != null) {
+            if (currentTileX != intersectionClaimX || currentTileY != intersectionClaimY) {
+                // We've left the intersection
+                intersectionClaimX = null;
+                intersectionClaimY = null;
+            }
+        }
+
         arrivedThisUpdate = true;
-        chooseNextTarget(map);
+        chooseNextTarget(map, allVehicles, trafficLights);
+    }
+
+    protected void updateDirection() {
+        if (lastMoveDx == 0 && lastMoveDy == -1) currentDirection = 1; // North
+        else if (lastMoveDx == 1 && lastMoveDy == 0) currentDirection = 2; // East
+        else if (lastMoveDx == 0 && lastMoveDy == 1) currentDirection = 3; // South
+        else if (lastMoveDx == -1 && lastMoveDy == 0) currentDirection = 4; // West
+        else currentDirection = 0; // None/stopped
     }
 
     protected void chooseNextTarget(Map map) {
+        chooseNextTarget(map, null, null);
+    }
+
+    protected void chooseNextTarget(Map map, List<Vehicle> allVehicles) {
+        chooseNextTarget(map, allVehicles, null);
+    }
+
+    protected void chooseNextTarget(Map map, List<Vehicle> allVehicles, List<game.building.TrafficLight> trafficLights) {
         if (!hasPath()) {
             targetTileX = null;
             targetTileY = null;
@@ -272,9 +414,130 @@ public class Vehicle {
             return;
         }
 
+        // Calculate what our direction WILL BE when we move to next tile
+        int plannedDirection = getPlannedDirection(next[0], next[1]);
+
+        // Check for traffic light at the next tile
+        game.building.TrafficLight lightAtNext = findTrafficLightAt(trafficLights, next[0], next[1]);
+        if (lightAtNext != null) {
+            // Check if light is red for our direction
+            if (!lightAtNext.isGreen(plannedDirection)) {
+                // MUST STOP at red light
+                targetTileX = null;
+                targetTileY = null;
+                return;
+            }
+        }
+
+        // Check for intersection conflict before setting target
+        if (allVehicles != null && isIntersection(map, next[0], next[1])) {
+            // If there's a traffic light, don't use intersection priority rules
+            if (lightAtNext == null && hasIntersectionConflict(next[0], next[1], allVehicles, plannedDirection)) {
+                // Wait - don't set target yet
+                targetTileX = null;
+                targetTileY = null;
+                return;
+            }
+            // Claim this intersection as ours (only if no traffic light)
+            if (lightAtNext == null) {
+                intersectionClaimX = next[0];
+                intersectionClaimY = next[1];
+            }
+        } else {
+            // Not an intersection or no conflict, clear claim
+            intersectionClaimX = null;
+            intersectionClaimY = null;
+        }
+
         targetTileX = next[0];
         targetTileY = next[1];
         pathIndex = nextIndex;
+    }
+
+    /**
+     * Find a traffic light at the specified coordinates.
+     */
+    private static game.building.TrafficLight findTrafficLightAt(List<game.building.TrafficLight> trafficLights, int x, int y) {
+        if (trafficLights == null) return null;
+        for (game.building.TrafficLight light : trafficLights) {
+            if (light != null && light.getX() == x && light.getY() == y) {
+                return light;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Check if a tile is an intersection (has more than 2 road neighbors).
+     */
+    protected boolean isIntersection(Map map, int x, int y) {
+        if (!isRoad(map, x, y)) return false;
+        return roadNeighbors(map, x, y).size() > 2;
+    }
+
+    /**
+     * Check if there's a vehicle in the intersection moving on a crossing path.
+     * Returns true if we should wait.
+     * We must wait until ANY vehicle with a crossing path has left the intersection.
+     * First vehicle to claim the intersection gets priority.
+     */
+    protected boolean hasIntersectionConflict(int intersectionX, int intersectionY, List<Vehicle> allVehicles, int plannedDirection) {
+        if (allVehicles == null) return false;
+        if (plannedDirection == 0) return false;
+
+        for (Vehicle other : allVehicles) {
+            if (other == this) continue;
+            if (!other.isSpawned()) continue;
+
+            // Check if other vehicle is in the intersection
+            boolean otherInIntersection = (other.currentTileX == intersectionX && other.currentTileY == intersectionY);
+
+            // Check if other vehicle has claimed this intersection (got there first)
+            boolean otherClaimedIntersection = (other.intersectionClaimX != null &&
+                                                 other.intersectionClaimX == intersectionX &&
+                                                 other.intersectionClaimY == intersectionY);
+
+            if (otherInIntersection || otherClaimedIntersection) {
+                // Use the other vehicle's current direction
+                int otherDirection = other.currentDirection;
+
+                // If other vehicle doesn't have a direction yet but has a target, calculate it
+                if (otherDirection == 0 && other.targetTileX != null && other.targetTileY != null) {
+                    otherDirection = other.getPlannedDirection(other.targetTileX, other.targetTileY);
+                }
+
+                // Check if paths cross
+                if (pathsCross(plannedDirection, otherDirection)) {
+                    return true; // Conflict - we must wait until other leaves
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Determine which direction we plan to move when entering the intersection.
+     */
+    protected int getPlannedDirection(int nextTileX, int nextTileY) {
+        int dx = nextTileX - currentTileX;
+        int dy = nextTileY - currentTileY;
+
+        if (dx == 0 && dy == -1) return 1; // North
+        if (dx == 1 && dy == 0) return 2; // East
+        if (dx == 0 && dy == 1) return 3; // South
+        if (dx == -1 && dy == 0) return 4; // West
+        return 0;
+    }
+
+    /**
+     * Check if two directions cross each other (are perpendicular).
+     * 1=N, 2=E, 3=S, 4=W
+     */
+    protected boolean pathsCross(int dir1, int dir2) {
+        if (dir1 == 0 || dir2 == 0) return false;
+        // North/South (1,3) crosses East/West (2,4)
+        return (dir1 == 1 || dir1 == 3) && (dir2 == 2 || dir2 == 4)
+            || (dir1 == 2 || dir1 == 4) && (dir2 == 1 || dir2 == 3);
     }
 
     private static int indexOfTile(List<int[]> tiles, int x, int y) {
