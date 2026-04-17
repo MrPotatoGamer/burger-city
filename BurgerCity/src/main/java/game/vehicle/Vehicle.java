@@ -57,6 +57,9 @@ public class Vehicle {
     protected int currentDirection = 0;
     // Effective speed considering traffic ahead
     protected double effectiveSpeed;
+    // Track when this vehicle started approaching an intersection
+    protected Integer intersectionClaimX = null;
+    protected Integer intersectionClaimY = null;
 
     public Vehicle() {
         // Interpreted as tiles per second (converted internally to pixels/sec)
@@ -93,6 +96,9 @@ public class Vehicle {
         this.previousTileY = null;
         this.lastMoveDx = 0;
         this.lastMoveDy = 0;
+        this.currentDirection = 0;
+        this.intersectionClaimX = null;
+        this.intersectionClaimY = null;
         this.worldX = tileCenterX(tileX);
         this.worldY = tileCenterY(tileY);
     }
@@ -184,24 +190,32 @@ public class Vehicle {
 
     /**
      * Adjust effective speed based on vehicles ahead in the same direction.
-     * If a slower vehicle is ahead, match its speed.
+     * If another vehicle is on our target tile in the same direction, we MUST STOP (no overtaking).
      */
     protected void adjustSpeedForTraffic(List<Vehicle> allVehicles) {
-        effectiveSpeed = speed; // Reset to base speed
+        effectiveSpeed = speed; // Reset to base speed each tick
 
         if (allVehicles == null || targetTileX == null || targetTileY == null) return;
 
-        // Check if there's a vehicle on our target tile moving in the same direction
+        // Calculate our planned direction
+        int myPlannedDirection = getPlannedDirection(targetTileX, targetTileY);
+        if (myPlannedDirection == 0) myPlannedDirection = currentDirection;
+
         for (Vehicle other : allVehicles) {
             if (other == this) continue;
             if (!other.isSpawned()) continue;
 
-            // Check if other vehicle is on our target tile
+            // Determine other vehicle's direction
+            int otherDirection = other.currentDirection;
+            if (otherDirection == 0 && other.targetTileX != null && other.targetTileY != null) {
+                otherDirection = other.getPlannedDirection(other.targetTileX, other.targetTileY);
+            }
+
+            // If other is on our target tile in the same direction, we MUST STOP
             if (other.currentTileX == targetTileX && other.currentTileY == targetTileY) {
-                // Check if moving in same direction
-                if (other.currentDirection == currentDirection && other.currentDirection != 0) {
-                    // Match the slower speed
-                    effectiveSpeed = Math.min(effectiveSpeed, other.effectiveSpeed);
+                if (otherDirection == myPlannedDirection && otherDirection != 0) {
+                    effectiveSpeed = 0; // STOP - cannot overtake
+                    return;
                 }
             }
         }
@@ -276,6 +290,15 @@ public class Vehicle {
         // Update direction based on movement
         updateDirection();
 
+        // Clear intersection claim if we're leaving it
+        if (intersectionClaimX != null && intersectionClaimY != null) {
+            if (currentTileX != intersectionClaimX || currentTileY != intersectionClaimY) {
+                // We've left the intersection
+                intersectionClaimX = null;
+                intersectionClaimY = null;
+            }
+        }
+
         arrivedThisUpdate = true;
         chooseNextTarget(map, allVehicles);
     }
@@ -335,14 +358,24 @@ public class Vehicle {
             return;
         }
 
+        // Calculate what our direction WILL BE when we move to next tile
+        int plannedDirection = getPlannedDirection(next[0], next[1]);
+
         // Check for intersection conflict before setting target
         if (allVehicles != null && isIntersection(map, next[0], next[1])) {
-            if (hasIntersectionConflict(next[0], next[1], allVehicles)) {
+            if (hasIntersectionConflict(next[0], next[1], allVehicles, plannedDirection)) {
                 // Wait - don't set target yet
                 targetTileX = null;
                 targetTileY = null;
                 return;
             }
+            // Claim this intersection as ours
+            intersectionClaimX = next[0];
+            intersectionClaimY = next[1];
+        } else {
+            // Not an intersection or no conflict, clear claim
+            intersectionClaimX = null;
+            intersectionClaimY = null;
         }
 
         targetTileX = next[0];
@@ -361,22 +394,37 @@ public class Vehicle {
     /**
      * Check if there's a vehicle in the intersection moving on a crossing path.
      * Returns true if we should wait.
+     * We must wait until ANY vehicle with a crossing path has left the intersection.
+     * First vehicle to claim the intersection gets priority.
      */
-    protected boolean hasIntersectionConflict(int intersectionX, int intersectionY, List<Vehicle> allVehicles) {
+    protected boolean hasIntersectionConflict(int intersectionX, int intersectionY, List<Vehicle> allVehicles, int plannedDirection) {
         if (allVehicles == null) return false;
-
-        int plannedDirection = getPlannedDirection(intersectionX, intersectionY);
         if (plannedDirection == 0) return false;
 
         for (Vehicle other : allVehicles) {
             if (other == this) continue;
             if (!other.isSpawned()) continue;
 
-            // Check if other vehicle is already in the intersection
-            if (other.currentTileX == intersectionX && other.currentTileY == intersectionY) {
+            // Check if other vehicle is in the intersection
+            boolean otherInIntersection = (other.currentTileX == intersectionX && other.currentTileY == intersectionY);
+
+            // Check if other vehicle has claimed this intersection (got there first)
+            boolean otherClaimedIntersection = (other.intersectionClaimX != null &&
+                                                 other.intersectionClaimX == intersectionX &&
+                                                 other.intersectionClaimY == intersectionY);
+
+            if (otherInIntersection || otherClaimedIntersection) {
+                // Use the other vehicle's current direction
+                int otherDirection = other.currentDirection;
+
+                // If other vehicle doesn't have a direction yet but has a target, calculate it
+                if (otherDirection == 0 && other.targetTileX != null && other.targetTileY != null) {
+                    otherDirection = other.getPlannedDirection(other.targetTileX, other.targetTileY);
+                }
+
                 // Check if paths cross
-                if (pathsCross(plannedDirection, other.currentDirection)) {
-                    return true; // Conflict - we must wait
+                if (pathsCross(plannedDirection, otherDirection)) {
+                    return true; // Conflict - we must wait until other leaves
                 }
             }
         }

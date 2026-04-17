@@ -843,7 +843,7 @@ public class GameUI extends JFrame {
 
             for (Vehicle v : vehicles) {
                 if (v == null) continue;
-                v.update(map, gameDeltaSeconds);
+                v.update(map, gameDeltaSeconds, vehicles);
                 v.processArrivalEconomy(map, player);
             }
         }
