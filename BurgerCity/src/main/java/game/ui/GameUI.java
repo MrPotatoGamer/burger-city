@@ -854,7 +854,10 @@ public class GameUI extends JFrame {
     }
 
     private void showTrafficLightSettings(TrafficLight light) {
-        JPanel panel = new JPanel(new GridLayout(4, 2, 5, 5));
+        JPanel panel = new JPanel(new BorderLayout(5, 5));
+
+        // Settings panel
+        JPanel settingsPanel = new JPanel(new GridLayout(2, 2, 5, 5));
 
         JLabel mainLabel = new JLabel("North-South (Main) duration (sec):");
         JTextField mainField = new JTextField(String.valueOf((int)light.getGreenDurationMain()));
@@ -862,20 +865,68 @@ public class GameUI extends JFrame {
         JLabel crossLabel = new JLabel("East-West (Cross) duration (sec):");
         JTextField crossField = new JTextField(String.valueOf((int)light.getGreenDurationCross()));
 
-        panel.add(mainLabel);
-        panel.add(mainField);
-        panel.add(crossLabel);
-        panel.add(crossField);
+        settingsPanel.add(mainLabel);
+        settingsPanel.add(mainField);
+        settingsPanel.add(crossLabel);
+        settingsPanel.add(crossField);
 
-        int result = JOptionPane.showConfirmDialog(
+        // Delete button
+        JButton deleteButton = new JButton("Delete Traffic Light");
+        deleteButton.setForeground(Color.RED);
+
+        panel.add(settingsPanel, BorderLayout.CENTER);
+        panel.add(deleteButton, BorderLayout.SOUTH);
+
+        // Custom dialog with options
+        Object[] options = {"Save", "Cancel"};
+        final boolean[] deleted = {false};
+
+        deleteButton.addActionListener(e -> {
+            int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Are you sure you want to delete this traffic light?",
+                "Confirm Delete",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+            );
+
+            if (confirm == JOptionPane.YES_OPTION) {
+                // Remove from list
+                trafficLights.remove(light);
+                mapRenderer.setTrafficLights(trafficLights);
+
+                // Remove from map tile
+                Tile tile = map.getTile(light.getX(), light.getY());
+                if (tile != null) {
+                    tile.setOccupied(false);
+                    tile.setPlacedBuilding(null);
+                }
+
+                mapRenderer.repaint();
+                updateStatus("Traffic light deleted at (" + light.getX() + ", " + light.getY() + ")");
+                deleted[0] = true;
+
+                // Close the settings dialog
+                Window window = SwingUtilities.getWindowAncestor(panel);
+                if (window != null) {
+                    window.dispose();
+                }
+            }
+        });
+
+        int result = JOptionPane.showOptionDialog(
             this,
             panel,
             "Traffic Light Settings at (" + light.getX() + ", " + light.getY() + ")",
             JOptionPane.OK_CANCEL_OPTION,
-            JOptionPane.PLAIN_MESSAGE
+            JOptionPane.PLAIN_MESSAGE,
+            null,
+            options,
+            options[0]
         );
 
-        if (result == JOptionPane.OK_OPTION) {
+        // Only update settings if not deleted and user clicked Save
+        if (!deleted[0] && result == JOptionPane.OK_OPTION) {
             try {
                 double mainDuration = Double.parseDouble(mainField.getText());
                 double crossDuration = Double.parseDouble(crossField.getText());
