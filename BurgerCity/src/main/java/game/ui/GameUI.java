@@ -524,7 +524,7 @@ public class GameUI extends JFrame {
                 updateStatus("Közlekedési lámpa csak útra építhető!");
                 return;
             }
-            if (targetTile.isOccupied()) {
+            if (targetTile.isOccupied() && targetTile.getType() != TileType.ROAD) {
                 updateStatus("Ez a mező foglalt (már van lámpa), ide nem lehet építeni.");
                 return;
             }
