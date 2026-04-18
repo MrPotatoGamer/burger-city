@@ -560,28 +560,29 @@ public class MapRenderer extends JPanel {
         int width = map.getWidth() * TILE_SIZE;
         int height = map.getHeight() * TILE_SIZE;
 
-        grassLayerCache = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        grassLayerCache = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = grassLayerCache.createGraphics();
 
         // Gyors rendering beállítások
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
 
-        // Rendereljük az összes fű tile-t egyszer
+        // Rendereljük az összes fű tile-t egyszer. A nem-fű részeket átlátszóra hagyjuk,
+        // hogy a háttér (grassBackgroundPaint) látszódjon.
         for (int x = 0; x < map.getWidth(); x++) {
             for (int y = 0; y < map.getHeight(); y++) {
                 Tile tile = map.getTile(x, y);
                 if (tile != null && tile.getType() == TileType.GRASS) {
                     g.drawImage(grassTexture, x * TILE_SIZE, y * TILE_SIZE, null);
-                } else {
-                    // Nem-fű tile-ok: átlátszó vagy alapszín
-                    g.setColor(Color.BLACK);
-                    g.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                 }
             }
         }
 
         g.dispose();
+    }
+
+    public void rebuildGrassLayerCache() {
+        buildGrassLayerCache();
     }
 
     private void drawCity(Graphics2D g2, City city) {
