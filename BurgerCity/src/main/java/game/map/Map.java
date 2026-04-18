@@ -375,6 +375,21 @@ public class Map {
     }
 
     /**
+     * Demolishes a FOREST tile back to GRASS.
+     */
+    public boolean demolishForest(int x, int y) {
+        if (!inBounds(x, y)) return false;
+        Tile tile = getTile(x, y);
+        if (tile == null) return false;
+        if (tile.getType() != TileType.FOREST) return false;
+
+        tile.setType(TileType.GRASS);
+        tile.setWalkable(true);
+        tile.setOccupied(false);
+        return true;
+    }
+
+    /**
      * Check if a traffic light at (x, y) is still valid.
      * A traffic light is valid if:
      * - The tile is ROAD

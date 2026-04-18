@@ -540,7 +540,7 @@ public class GameUI extends JFrame {
 
             demolishButton.setBackground(Color.GREEN);
             demolishButton.setText("Rombolás BE");
-            updateStatus("Kattints egy útra / épületre / industry-re a romboláshoz (út: 0$ vissza, épület: 50%, industry: 50%).");
+            updateStatus("Kattints egy útra / épületre / industry-re / erdőre a romboláshoz (út: 0$ vissza, épület: 50%, industry: 50%, erdő: +20$/tile).");
         } else {
             demolishButton.setBackground(null);
             demolishButton.setText("Rombolás");
@@ -750,7 +750,19 @@ public class GameUI extends JFrame {
             return;
         }
 
-        updateStatus("Itt nincs lerombolható út/épület/industry.");
+        if (tile.getType() == TileType.FOREST) {
+            if (map.demolishForest(tileX, tileY)) {
+                player.addMoney(20);
+                mapRenderer.rebuildGrassLayerCache();
+                mapRenderer.repaint();
+                updateStatus("Erdő kivágva (" + tileX + ", " + tileY + "). Bevétel: +20$. Pénz: " + player.getMoney() + "$");
+            } else {
+                updateStatus("Itt nincs kivágható erdő.");
+            }
+            return;
+        }
+
+        updateStatus("Itt nincs lerombolható út/épület/industry/erdő.");
     }
 
     private void handleBuyVehicleClick(int screenX, int screenY) {
