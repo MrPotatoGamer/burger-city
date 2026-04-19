@@ -1,5 +1,6 @@
 package game.ui;
 
+import game.building.Garage;
 import game.core.Player;
 import game.core.ResourcePrices;
 import game.map.City;
@@ -56,7 +57,7 @@ public class GameDashboard extends JPanel {
         setPreferredSize(new Dimension(310, 0));
 
         // Header
-        JLabel header = new JLabel("  \uD83D\uDCCA Game Dashboard", SwingConstants.LEFT);
+        header = new JLabel("  \uD83D\uDCCA Game Dashboard", SwingConstants.LEFT);
         header.setFont(new Font("SansSerif", Font.BOLD, 16));
         header.setForeground(ACCENT_GOLD);
         header.setBackground(BG_DARK);
@@ -153,6 +154,8 @@ public class GameDashboard extends JPanel {
             contentPanel.add(Box.createVerticalStrut(6));
             contentPanel.add(buildVehicleSummarySection());
             contentPanel.add(Box.createVerticalStrut(6));
+            contentPanel.add(buildGaragesSection());
+            contentPanel.add(Box.createVerticalStrut(6));
             contentPanel.add(buildCitiesSection());
             contentPanel.add(Box.createVerticalStrut(6));
             contentPanel.add(buildIndustriesSection());
@@ -241,15 +244,105 @@ public class GameDashboard extends JPanel {
                 cargo = v.getCurrentCargo().getType().getDisplayName()
                         + " x" + v.getCurrentCargo().getAmount();
             }
-            String status = v.hasPath() ? "En route" : "Idle";
+            String status = formatVehicleStatus(v);
             String pos = "(" + v.getCurrentTileX() + "," + v.getCurrentTileY() + ")";
 
-            addInfoRow(panel, " #" + idx + " " + type + " | " + status + " | " + cargo + " " + pos,
-                    v.hasPath() ? ACCENT_GREEN : TEXT_SECONDARY);
+            String age = String.format("%.0fs", v.getAgeSeconds());
+            String maint = v.isInMaintenance()
+                    ? String.format("Maint: %.0fs", v.getMaintenanceSecondsRemaining())
+                    : String.format("Maint in: %.0fs", v.getSecondsUntilMaintenanceDue());
+
+            addVehicleRow(panel,
+                    " #" + idx + " " + type + " | " + status + " | " + cargo + " | age " + age + " | " + maint + " " + pos,
+                    v);
             idx++;
         }
 
         return panel;
+    }
+
+    // ─── Garages ───────────────────────────────────────────────────
+
+    private JPanel buildGaragesSection() {
+        List<Garage> garages = map.getGarages();
+        JPanel panel = createSection("\uD83C\uDFE0 Garages (" + garages.size() + ")");
+
+        if (garages.isEmpty()) {
+            addInfoRow(panel, "No garages yet. Build one to enable maintenance.", TEXT_SECONDARY);
+            return panel;
+        }
+
+        for (Garage g : garages) {
+            if (g == null) continue;
+            int homeCount = 0;
+            int maintHere = 0;
+            for (Vehicle v : vehicles) {
+                if (v == null) continue;
+                if (v.getHomeGarage() == g) homeCount++;
+                if (v.isInMaintenance() && v.getMaintenanceGarage() == g) maintHere++;
+            }
+
+            panel.add(Box.createVerticalStrut(2));
+            addRow(panel, "\u25A0 Garage", "(" + g.getX() + ", " + g.getY() + ") | vehicles: " + homeCount + " | maint: " + maintHere,
+                    homeCount > 0 ? ACCENT_GREEN : TEXT_SECONDARY);
+
+            for (Vehicle v : vehicles) {
+                if (v == null) continue;
+                if (v.getHomeGarage() != g) continue;
+
+                String type = (v instanceof Bus) ? "Bus" : "Truck";
+                String age = String.format("%.0fs", v.getAgeSeconds());
+                String maint = v.isInMaintenance()
+                        ? String.format("Maint: %.0fs", v.getMaintenanceSecondsRemaining())
+                        : String.format("Maint in: %.0fs", v.getSecondsUntilMaintenanceDue());
+
+                addVehicleRow(panel, "   - " + type + " | age " + age + " | " + maint + " | " + formatVehicleStatus(v), v);
+            }
+        }
+
+        return panel;
+    }
+
+    private void addVehicleRow(JPanel parent, String text, Vehicle v) {
+        JPanel row = new JPanel(new BorderLayout());
+        row.setBackground(parent.getBackground());
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        Color color = (v != null && (v.isInMaintenance() || v.isGoingToMaintenance()))
+                ? ACCENT_ORANGE
+                : (v != null && v.hasPath()) ? ACCENT_GREEN : TEXT_SECONDARY;
+        lbl.setForeground(color);
+
+        row.add(lbl, BorderLayout.CENTER);
+
+        if (v != null && v.isTooOld()) {
+            JButton sellBtn = new JButton("Sell");
+            sellBtn.setFont(new Font("SansSerif", Font.BOLD, 10));
+            sellBtn.setForeground(ACCENT_RED);
+            sellBtn.setBackground(parent.getBackground());
+            sellBtn.setFocusPainted(false);
+            sellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            sellBtn.addActionListener(e -> {
+                int value = v.getSellValue();
+                vehicles.remove(v);
+                player.addMoney(value);
+                refresh();
+            });
+            row.add(sellBtn, BorderLayout.EAST);
+        }
+
+        parent.add(row);
+    }
+
+    private String formatVehicleStatus(Vehicle v) {
+        if (v == null) return "Unknown";
+        if (v.isInMaintenance()) return "Maintenance";
+        if (v.isGoingToMaintenance()) return "To garage";
+        if (v.hasPath()) return "En route";
+        return "Idle";
     }
 
     // ─── Cities ─────────────────────────────────────────────────────

@@ -79,6 +79,10 @@ public class GameUI extends JFrame {
     private SelectedBuilding startBuilding;
     private SelectedBuilding endBuilding;
 
+    private Garage selectedGarage;
+    private Integer selectedGarageRoadX;
+    private Integer selectedGarageRoadY;
+
     private record SelectedBuilding(String name, int originX, int originY, int width, int height) {}
 
     private static final int INITIAL_WINDOW_WIDTH = 1000;
@@ -363,7 +367,7 @@ public class GameUI extends JFrame {
             buyVehicleButton.setBackground(Color.GREEN);
             buyVehicleButton.setText("Jármű vásárlás BE (" + VEHICLE_COST + "$)");
             clearVehicleSelection();
-            updateStatus("Válassz 2 buildinget (város/ipar) kattintással, majd Bus/Truck.");
+            updateStatus("Kattints egy garázsra, majd válassz 2 buildinget (város/ipar) kattintással, majd Bus/Truck.");
         } else {
             buyVehicleButton.setBackground(null);
             buyVehicleButton.setText("Jármű vásárlás");
@@ -773,6 +777,26 @@ public class GameUI extends JFrame {
         int tileX = (int) (worldX / tileSize);
         int tileY = (int) (worldY / tileSize);
 
+        // Step 1: choose a garage
+        if (selectedGarage == null) {
+            Tile t = map.getTile(tileX, tileY);
+            if (t == null || t.getPlacedBuilding() == null || !(t.getPlacedBuilding() instanceof Garage g)) {
+                updateStatus("Először kattints egy garázsra a jármű vásárláshoz!");
+                return;
+            }
+            var roads = map.adjacentRoadTilesForArea(tileX, tileY, 1, 1);
+            if (roads.isEmpty()) {
+                updateStatus("A garázsnak út mellé kell kerülnie (nincs szomszédos ROAD). ");
+                return;
+            }
+            int[] r0 = roads.get(0);
+            selectedGarage = g;
+            selectedGarageRoadX = r0[0];
+            selectedGarageRoadY = r0[1];
+            updateStatus("Garázs kiválasztva: (" + tileX + ", " + tileY + "). Válassz kezdő buildinget.");
+            return;
+        }
+
         SelectedBuilding clicked = findBuildingAt(tileX, tileY);
         if (clicked == null) {
             updateStatus("Kattints egy városra vagy iparra (building)!");
@@ -797,12 +821,17 @@ public class GameUI extends JFrame {
         }
 
         // Harmadik kattintás: újrakezdjük a kiválasztást
-        clearVehicleSelection();
+        clearVehicleRouteSelection();
+        // Keep the garage selection; user only restarts the route selection.
         startBuilding = clicked;
         updateStatus("Kezdő building kiválasztva: " + startBuilding.name() + ". Válassz cél buildinget.");
     }
 
     private void placeVehicleIfPathValid() {
+        if (selectedGarage == null || selectedGarageRoadX == null || selectedGarageRoadY == null) {
+            updateStatus("Nincs kiválasztott garázs. Kattints egy garázsra!");
+            return;
+        }
         if (startBuilding == null || endBuilding == null) return;
 
         List<int[]> path = map.findRoadPathBetweenAreas(
@@ -812,6 +841,16 @@ public class GameUI extends JFrame {
 
         if (path.isEmpty()) {
             updateStatus("Nincs érvényes úthálózat a két building között! Építs összefüggő utat.");
+            return;
+        }
+
+        int[] routeStart = path.get(0);
+        List<int[]> fromGarage = map.findRoadPathBetweenRoadTiles(
+                selectedGarageRoadX, selectedGarageRoadY,
+                routeStart[0], routeStart[1]
+        );
+        if (fromGarage.isEmpty()) {
+            updateStatus("Nincs összefüggő út a garázstól a kiválasztott útvonalhoz! Kösd rá a garázst az úthálózatra.");
             return;
         }
 
@@ -847,12 +886,16 @@ public class GameUI extends JFrame {
         }
 
         Vehicle v = (choice == 0) ? new Bus() : new Truck();
-        v.setPath(path);
+        v.setHomeGarage(selectedGarage);
+        v.setPurchasePrice(VEHICLE_COST);
+        v.setRoutePath(path);
+        v.setRejoinRouteAt(routeStart[0], routeStart[1]);
+        v.setPath(fromGarage);
         v.setRouteBuildings(startBuilding.originX(), startBuilding.originY(),
                             endBuilding.originX(), endBuilding.originY());
         vehicles.add(v);
         mapRenderer.repaint();
-        updateStatus("Jármű lehelyezve: " + options[choice] + " | Útvonal: " + startBuilding.name() + " -> " + endBuilding.name());
+        updateStatus("Jármű megvásárolva garázsból: " + options[choice] + " | Útvonal: " + startBuilding.name() + " -> " + endBuilding.name());
         clearVehicleSelection();
     }
 
@@ -871,6 +914,14 @@ public class GameUI extends JFrame {
     }
 
     private void clearVehicleSelection() {
+        startBuilding = null;
+        endBuilding = null;
+        selectedGarage = null;
+        selectedGarageRoadX = null;
+        selectedGarageRoadY = null;
+    }
+
+    private void clearVehicleRouteSelection() {
         startBuilding = null;
         endBuilding = null;
     }
@@ -1113,6 +1164,7 @@ public class GameUI extends JFrame {
                 toRemove.add(light);
 
                 // Clear the tile
+ 
                 Tile tile = map.getTile(light.getX(), light.getY());
                 if (tile != null) {
                     tile.setOccupied(false);

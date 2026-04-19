@@ -1,6 +1,7 @@
 package game.map;
 
 import game.building.Building;
+import game.building.Garage;
 
 import java.util.ArrayList;
 import java.util.ArrayDeque;
@@ -268,6 +269,25 @@ public class Map {
     public List<Industry> getIndustries() { return industries; }
 
     /**
+     * Returns all placed Garages on the map.
+     */
+    public List<Garage> getGarages() {
+        List<Garage> out = new ArrayList<>();
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                Tile t = tiles[x][y];
+                if (t == null) continue;
+                if (t.getType() != TileType.BUILDING) continue;
+                Building b = t.getPlacedBuilding();
+                if (b instanceof Garage g) {
+                    out.add(g);
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
      * Economy tick: updates city demand/passenger generation and industry production.
      */
     public void updateEconomy(double deltaSeconds) {
@@ -309,6 +329,11 @@ public class Map {
             return true;
         }
 
+        // Garage must be connected to the road network (adjacent ROAD tile)
+        if (building instanceof Garage) {
+            if (!hasAdjacentRoad(x, y)) return false;
+        }
+
         // Regular buildings: only on grass
         if (tile.getType() != TileType.GRASS || tile.isOccupied()) return false;
 
@@ -317,6 +342,16 @@ public class Map {
         tile.setOccupied(true);
         tile.setPlacedBuilding(building);
         return true;
+    }
+
+    private boolean hasAdjacentRoad(int x, int y) {
+        return isRoadOnly(x, y - 1) || isRoadOnly(x + 1, y) || isRoadOnly(x, y + 1) || isRoadOnly(x - 1, y);
+    }
+
+    private boolean isRoadOnly(int x, int y) {
+        if (!inBounds(x, y)) return false;
+        Tile t = getTile(x, y);
+        return t != null && t.getType() == TileType.ROAD;
     }
 
     /**
@@ -510,6 +545,75 @@ public class Map {
             path.set(j, tmp);
         }
         return path;
+    }
+
+    /**
+     * Finds a ROAD-only path between two ROAD tiles (inclusive).
+     * Returns an empty list if no valid path exists.
+     */
+    public List<int[]> findRoadPathBetweenRoadTiles(int startX, int startY, int targetX, int targetY) {
+        if (!inBounds(startX, startY) || !inBounds(targetX, targetY)) return List.of();
+        Tile s = getTile(startX, startY);
+        Tile t = getTile(targetX, targetY);
+        if (s == null || t == null) return List.of();
+        if (s.getType() != TileType.ROAD || t.getType() != TileType.ROAD) return List.of();
+
+        int startKey = toKey(startX, startY);
+        int targetKey = toKey(targetX, targetY);
+        if (startKey == targetKey) return List.of(new int[]{startX, startY});
+
+        boolean[] isTarget = new boolean[width * height];
+        isTarget[targetKey] = true;
+
+        int[] parent = new int[width * height];
+        boolean[] visited = new boolean[width * height];
+        for (int i = 0; i < parent.length; i++) parent[i] = -1;
+
+        Deque<Integer> q = new ArrayDeque<>();
+        visited[startKey] = true;
+        parent[startKey] = -2;
+        q.addLast(startKey);
+
+        int found = -1;
+        while (!q.isEmpty()) {
+            int cur = q.removeFirst();
+            int cx = cur / height;
+            int cy = cur % height;
+
+            found = bfsEnqueueRoadNeighbor(cx + 1, cy, cur, visited, parent, q, isTarget);
+            if (found != -1) break;
+            found = bfsEnqueueRoadNeighbor(cx - 1, cy, cur, visited, parent, q, isTarget);
+            if (found != -1) break;
+            found = bfsEnqueueRoadNeighbor(cx, cy + 1, cur, visited, parent, q, isTarget);
+            if (found != -1) break;
+            found = bfsEnqueueRoadNeighbor(cx, cy - 1, cur, visited, parent, q, isTarget);
+            if (found != -1) break;
+        }
+
+        if (found == -1) return List.of();
+
+        List<int[]> path = new ArrayList<>();
+        int cur = found;
+        while (cur != -2) {
+            int x = cur / height;
+            int y = cur % height;
+            path.add(new int[]{x, y});
+            cur = parent[cur];
+        }
+
+        for (int i = 0, j = path.size() - 1; i < j; i++, j--) {
+            int[] tmp = path.get(i);
+            path.set(i, path.get(j));
+            path.set(j, tmp);
+        }
+        return path;
+    }
+
+    /**
+     * Returns ROAD tiles adjacent to the given rectangular area.
+     */
+    public List<int[]> adjacentRoadTilesForArea(int ox, int oy, int w, int h) {
+        return adjacentRoadTiles(ox, oy, w, h);
     }
 
     private int bfsEnqueueRoadNeighbor(int nx, int ny, int fromKey,
