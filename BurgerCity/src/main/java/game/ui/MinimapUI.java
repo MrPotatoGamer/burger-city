@@ -41,7 +41,7 @@ public class MinimapUI extends JPanel {
         setPreferredSize(new Dimension(310, 190));
         setMinimumSize(new Dimension(180, 140));
         setOpaque(true);
-        setBackground(new Color(25, 25, 25));
+        setBackground(tileColors.getOrDefault(TileType.GRASS, new Color(25, 25, 25)));
 
         MouseAdapter adapter = new MouseAdapter() {
             private boolean dragging = false;
@@ -69,10 +69,10 @@ public class MinimapUI extends JPanel {
 
     private void navigateTo(int mouseX, int mouseY) {
         RenderTransform t = computeTransform();
-        if (t.scale <= 0) return;
+        if (t.scaleX <= 0 || t.scaleY <= 0) return;
 
-        double worldX = (mouseX - t.offsetX) / t.scale;
-        double worldY = (mouseY - t.offsetY) / t.scale;
+        double worldX = (mouseX - t.offsetX) / t.scaleX;
+        double worldY = (mouseY - t.offsetY) / t.scaleY;
 
         worldX = clamp(worldX, 0, t.worldW);
         worldY = clamp(worldY, 0, t.worldH);
@@ -86,7 +86,7 @@ public class MinimapUI extends JPanel {
         return Math.max(min, Math.min(v, max));
     }
 
-    private record RenderTransform(int offsetX, int offsetY, double scale, int worldW, int worldH) {}
+    private record RenderTransform(int offsetX, int offsetY, double scaleX, double scaleY, int worldW, int worldH) {}
 
     private RenderTransform computeTransform() {
         int panelW = Math.max(1, getWidth());
@@ -96,19 +96,14 @@ public class MinimapUI extends JPanel {
         int worldH = map.getHeight() * TILE_SIZE;
 
         if (worldW <= 0 || worldH <= 0) {
-            return new RenderTransform(0, 0, 1.0, 1, 1);
+            return new RenderTransform(0, 0, 1.0, 1.0, 1, 1);
         }
 
-        double sx = panelW / (double) worldW;
-        double sy = panelH / (double) worldH;
-        double scale = Math.min(sx, sy);
+        // Fill the whole minimap panel: non-uniform scaling (no letterboxing).
+        double scaleX = panelW / (double) worldW;
+        double scaleY = panelH / (double) worldH;
 
-        int drawW = (int) Math.round(worldW * scale);
-        int drawH = (int) Math.round(worldH * scale);
-        int offX = (panelW - drawW) / 2;
-        int offY = (panelH - drawH) / 2;
-
-        return new RenderTransform(offX, offY, scale, worldW, worldH);
+        return new RenderTransform(0, 0, scaleX, scaleY, worldW, worldH);
     }
 
     @Override
@@ -119,13 +114,13 @@ public class MinimapUI extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
         g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
 
-        RenderTransform t = computeTransform();
-        int drawW = (int) Math.round(t.worldW * t.scale);
-        int drawH = (int) Math.round(t.worldH * t.scale);
+        // Fill entire minimap panel to avoid black bars when aspect ratio doesn't match.
+        g2.setColor(tileColors.getOrDefault(TileType.GRASS, getBackground()));
+        g2.fillRect(0, 0, getWidth(), getHeight());
 
-        // Map background area
-        g2.setColor(new Color(35, 35, 35));
-        g2.fillRect(t.offsetX, t.offsetY, drawW, drawH);
+        RenderTransform t = computeTransform();
+        int drawW = getWidth();
+        int drawH = getHeight();
 
         // Draw tiles
         for (int x = 0; x < map.getWidth(); x++) {
@@ -138,10 +133,10 @@ public class MinimapUI extends JPanel {
                 int wx = x * TILE_SIZE;
                 int wy = y * TILE_SIZE;
 
-                int px = t.offsetX + (int) Math.floor(wx * t.scale);
-                int py = t.offsetY + (int) Math.floor(wy * t.scale);
-                int pw = Math.max(1, (int) Math.ceil(TILE_SIZE * t.scale));
-                int ph = Math.max(1, (int) Math.ceil(TILE_SIZE * t.scale));
+                int px = t.offsetX + (int) Math.floor(wx * t.scaleX);
+                int py = t.offsetY + (int) Math.floor(wy * t.scaleY);
+                int pw = Math.max(1, (int) Math.ceil(TILE_SIZE * t.scaleX));
+                int ph = Math.max(1, (int) Math.ceil(TILE_SIZE * t.scaleY));
 
                 g2.fillRect(px, py, pw, ph);
             }
@@ -154,10 +149,10 @@ public class MinimapUI extends JPanel {
         double viewWWorld = camera.getViewportWidth() / zoom;
         double viewHWorld = camera.getViewportHeight() / zoom;
 
-        int rx = t.offsetX + (int) Math.round(viewLeftWorld * t.scale);
-        int ry = t.offsetY + (int) Math.round(viewTopWorld * t.scale);
-        int rw = (int) Math.round(viewWWorld * t.scale);
-        int rh = (int) Math.round(viewHWorld * t.scale);
+        int rx = t.offsetX + (int) Math.round(viewLeftWorld * t.scaleX);
+        int ry = t.offsetY + (int) Math.round(viewTopWorld * t.scaleY);
+        int rw = (int) Math.round(viewWWorld * t.scaleX);
+        int rh = (int) Math.round(viewHWorld * t.scaleY);
 
         g2.setColor(new Color(255, 60, 60));
         g2.drawRect(rx, ry, rw, rh);
