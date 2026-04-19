@@ -51,6 +51,15 @@ public class Camera {
         clampPosition();
     }
 
+    /**
+     * Centers the camera on a world-space point (in unzoomed world pixels).
+     */
+    public void centerOnWorld(double worldX, double worldY) {
+        x = worldX * zoom - viewportWidth / 2.0;
+        y = worldY * zoom - viewportHeight / 2.0;
+        clampPosition();
+    }
+
     private void clampPosition() {
         double maxX = Math.max(0, worldWidth * zoom - viewportWidth);
         double maxY = Math.max(0, worldHeight * zoom - viewportHeight);

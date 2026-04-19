@@ -65,6 +65,7 @@ public class GameUI extends JFrame {
     private Timer gameTimer;
 
     private GameDashboard dashboard;
+    private MinimapUI minimap;
     private int dashboardRefreshCounter = 0;
     private JButton toggleDashboardButton;
 
@@ -188,9 +189,14 @@ public class GameUI extends JFrame {
 
         add(mapRenderer, BorderLayout.CENTER);
 
-        // Dashboard panel (right side)
+        // Right side: dashboard + navigable minimap
         dashboard = new GameDashboard(player, map, vehicles);
-        add(dashboard, BorderLayout.EAST);
+        minimap = new MinimapUI(map, mapRenderer.getCamera(), () -> mapRenderer.repaint());
+
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.add(dashboard, BorderLayout.CENTER);
+        rightPanel.add(minimap, BorderLayout.SOUTH);
+        add(rightPanel, BorderLayout.EAST);
 
         // Wrapper for top panels (time control + buttons)
         JPanel topWrapper = new JPanel();
@@ -1138,6 +1144,7 @@ public class GameUI extends JFrame {
         timeControlPanel.refresh();
 
         mapRenderer.repaint();
+        if (minimap != null) minimap.repaint();
 
         // Always reflect current money even without new status messages.
         statusBar.setText(" " + lastStatusMessage + " | Pénz: " + player.getMoney() + "$");
