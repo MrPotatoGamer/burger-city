@@ -24,8 +24,24 @@ public class Vehicle {
     protected int speed;
     protected int capacity;
     protected int maintenanceCost;
-    protected int age;
-    protected int timeSinceMaintenance;
+    protected double ageSeconds;
+    protected double secondsSinceMaintenance;
+
+    // Maintenance state
+    protected boolean goingToMaintenance = false;
+    protected boolean inMaintenance = false;
+    protected double maintenanceSecondsRemaining = 0;
+    protected Garage maintenanceGarage;
+    protected Integer maintenanceDestRoadX;
+    protected Integer maintenanceDestRoadY;
+
+    // Route management
+    protected List<int[]> routePathTiles = List.of();
+    protected boolean rejoiningRoute = false;
+    protected Integer rejoinRouteAtX;
+    protected Integer rejoinRouteAtY;
+
+    protected int purchasePrice = 0;
 
     protected Route route;
     protected Resource currentCargo;
@@ -59,6 +75,7 @@ public class Vehicle {
     protected boolean pathForward = true;
 
     private boolean arrivedThisUpdate = false;
+    private boolean maintenanceRequested = false;
 
     // Traffic management: direction on current tile (0=none, 1=N, 2=E, 3=S, 4=W)
     protected int currentDirection = 0;
@@ -72,6 +89,81 @@ public class Vehicle {
         // Interpreted as tiles per second (converted internally to pixels/sec)
         this.speed = 2;
         this.effectiveSpeed = this.speed;
+    }
+
+    public void setPurchasePrice(int purchasePrice) {
+        this.purchasePrice = Math.max(0, purchasePrice);
+    }
+
+    public int getPurchasePrice() {
+        return purchasePrice;
+    }
+
+    public void setHomeGarage(Garage garage) {
+        this.garage = garage;
+    }
+
+    public Garage getHomeGarage() {
+        return garage;
+    }
+
+    public Garage getMaintenanceGarage() {
+        return maintenanceGarage;
+    }
+
+    public double getAgeSeconds() {
+        return ageSeconds;
+    }
+
+    public double getMaintenanceIntervalSeconds() {
+        // Older vehicles need maintenance more often.
+        // Starts at ~120s and drops linearly until a minimum.
+        double base = 120.0;
+        double min = 30.0;
+        double interval = base - (ageSeconds * 0.20);
+        return Math.max(min, interval);
+    }
+
+    public double getSecondsUntilMaintenanceDue() {
+        return Math.max(0.0, getMaintenanceIntervalSeconds() - secondsSinceMaintenance);
+    }
+
+    public boolean isGoingToMaintenance() {
+        return goingToMaintenance;
+    }
+
+    public boolean isInMaintenance() {
+        return inMaintenance;
+    }
+
+    public double getMaintenanceSecondsRemaining() {
+        return maintenanceSecondsRemaining;
+    }
+
+    public boolean isTooOld() {
+        return ageSeconds >= 600.0; // 10 minutes of game-time by default
+    }
+
+    public int getSellValue() {
+        if (purchasePrice <= 0) return 0;
+        // Simple rule: half price.
+        return purchasePrice / 2;
+    }
+
+    /**
+     * Store the main working route (between the selected buildings).
+     */
+    public void setRoutePath(List<int[]> routePathTiles) {
+        this.routePathTiles = (routePathTiles == null) ? List.of() : routePathTiles;
+    }
+
+    /**
+     * After reaching (x,y) on the current path, the vehicle will switch back to its stored route.
+     */
+    public void setRejoinRouteAt(int x, int y) {
+        this.rejoiningRoute = true;
+        this.rejoinRouteAtX = x;
+        this.rejoinRouteAtY = y;
     }
 
     public GameSnapshot.VehicleData exportSaveData() {
@@ -294,8 +386,58 @@ public class Vehicle {
         Objects.requireNonNull(map, "map");
         if (deltaSeconds <= 0) return;
 
+        // Age and maintenance timers always advance (even if idle).
+        ageSeconds += deltaSeconds;
+        secondsSinceMaintenance += deltaSeconds;
+
+        // If currently in maintenance, just wait it out.
+        if (inMaintenance) {
+            maintenanceSecondsRemaining -= deltaSeconds;
+            if (maintenanceSecondsRemaining <= 0) {
+                inMaintenance = false;
+                maintenanceSecondsRemaining = 0;
+                secondsSinceMaintenance = 0;
+                // After maintenance, try to rejoin the route at its start tile.
+                if (routePathTiles != null && !routePathTiles.isEmpty()) {
+                    int[] join = routePathTiles.get(0);
+                    List<int[]> toJoin = map.findRoadPathBetweenRoadTiles(currentTileX, currentTileY, join[0], join[1]);
+                    if (!toJoin.isEmpty()) {
+                        rejoiningRoute = true;
+                        rejoinRouteAtX = join[0];
+                        rejoinRouteAtY = join[1];
+                        setPath(toJoin);
+                    } else {
+                        // Fallback: continue on the stored route (teleport-free switch happens when possible).
+                        switchToRouteAtCurrentTile();
+                    }
+                }
+            }
+            return;
+        }
+
+        // If a previous arrival flagged maintenance, start the garage trip now (next tick).
+        if (maintenanceRequested) {
+            maintenanceRequested = false;
+            startGoingToNearestGarage(map);
+            if (goingToMaintenance) return;
+        }
+
+        // If we reached the route-join point, switch back to the working route.
+        if (rejoiningRoute
+                && rejoinRouteAtX != null && rejoinRouteAtY != null
+                && currentTileX == rejoinRouteAtX && currentTileY == rejoinRouteAtY) {
+            rejoiningRoute = false;
+            rejoinRouteAtX = null;
+            rejoinRouteAtY = null;
+            switchToRouteAtCurrentTile();
+        }
+
         // Vehicle only moves when a valid path is assigned.
-        if (!hasPath()) return;
+        if (!hasPath()) {
+            // If maintenance is due and we have garages, we can start going when idle.
+            maybeStartMaintenance(map);
+            return;
+        }
 
         // If we don't have a target yet, try to acquire one.
         if (targetTileX == null || targetTileY == null) {
@@ -329,6 +471,60 @@ public class Vehicle {
 
         worldX += (dx / dist) * step;
         worldY += (dy / dist) * step;
+    }
+
+    private void maybeStartMaintenance(Map map) {
+        if (map == null) return;
+        if (goingToMaintenance || inMaintenance || rejoiningRoute) return;
+        if (getSecondsUntilMaintenanceDue() > 0) return;
+        startGoingToNearestGarage(map);
+    }
+
+    private void startGoingToNearestGarage(Map map) {
+        List<Garage> garages = map.getGarages();
+        if (garages == null || garages.isEmpty()) return;
+
+        List<int[]> bestPath = List.of();
+        Garage bestGarage = null;
+        Integer bestRX = null;
+        Integer bestRY = null;
+
+        for (Garage g : garages) {
+            if (g == null) continue;
+            List<int[]> roads = map.adjacentRoadTilesForArea(g.getX(), g.getY(), 1, 1);
+            for (int[] r : roads) {
+                if (r == null || r.length < 2) continue;
+                List<int[]> p = map.findRoadPathBetweenRoadTiles(currentTileX, currentTileY, r[0], r[1]);
+                if (p.isEmpty()) continue;
+                if (bestPath.isEmpty() || p.size() < bestPath.size()) {
+                    bestPath = p;
+                    bestGarage = g;
+                    bestRX = r[0];
+                    bestRY = r[1];
+                }
+            }
+        }
+
+        if (bestGarage == null || bestPath.isEmpty()) return;
+
+        maintenanceGarage = bestGarage;
+        maintenanceDestRoadX = bestRX;
+        maintenanceDestRoadY = bestRY;
+        goingToMaintenance = true;
+
+        // Use a temporary path to the garage. Starts at current tile so no teleport.
+        setPath(bestPath);
+    }
+
+    private void switchToRouteAtCurrentTile() {
+        if (routePathTiles == null || routePathTiles.isEmpty()) return;
+
+        this.pathTiles = routePathTiles;
+        int idx = indexOfTile(routePathTiles, currentTileX, currentTileY);
+        this.pathIndex = Math.max(0, idx);
+        this.pathForward = true;
+        this.targetTileX = null;
+        this.targetTileY = null;
     }
 
     /**
@@ -447,6 +643,26 @@ public class Vehicle {
         }
 
         arrivedThisUpdate = true;
+
+        // Maintenance: if we arrived at the garage destination, start maintenance.
+        if (goingToMaintenance
+                && maintenanceDestRoadX != null && maintenanceDestRoadY != null
+                && currentTileX == maintenanceDestRoadX && currentTileY == maintenanceDestRoadY) {
+            goingToMaintenance = false;
+            inMaintenance = true;
+            maintenanceSecondsRemaining = 5.0;
+
+            // Park in the garage (idle).
+            this.pathTiles = List.of();
+            this.targetTileX = null;
+            this.targetTileY = null;
+            return;
+        }
+
+        // If maintenance is due, request it and start the garage trip on the next tick.
+        if (getSecondsUntilMaintenanceDue() <= 0 && !goingToMaintenance && !rejoiningRoute) {
+            maintenanceRequested = true;
+        }
         chooseNextTarget(map, allVehicles, trafficLights);
     }
 
@@ -672,7 +888,7 @@ public class Vehicle {
     public void transport() {}
 
     public boolean needsMaintenance() {
-        return false;
+        return getSecondsUntilMaintenanceDue() <= 0;
     }
 
     public void goToGarage() {}
