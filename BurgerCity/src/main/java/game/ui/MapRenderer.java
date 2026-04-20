@@ -295,7 +295,15 @@ public class MapRenderer extends JPanel {
                     }
 
                     if (treeTexture != null) {
-                        g2.drawImage(treeTexture, px, py, null);
+                        int n = Math.max(1, Math.min(4, tile.getForestTrees()));
+                        int tw = TILE_SIZE / 2;
+                        int th = TILE_SIZE / 2;
+
+                        // Deterministic placement: up to 4 trees in quadrants.
+                        if (n >= 1) g2.drawImage(treeTexture, px, py, tw, th, null);
+                        if (n >= 2) g2.drawImage(treeTexture, px + tw, py, tw, th, null);
+                        if (n >= 3) g2.drawImage(treeTexture, px, py + th, tw, th, null);
+                        if (n >= 4) g2.drawImage(treeTexture, px + tw, py + th, tw, th, null);
                     }
                 } else if (tile.getType() == TileType.GRASS) {
                     // Fű tile-ok át lesznek ugorva, mert egy cache réteget rajzolunk
