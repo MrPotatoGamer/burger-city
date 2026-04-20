@@ -19,6 +19,10 @@ public class Map {
     private List<City> cities;
     private List<Industry> industries;
 
+    // Forest simulation
+    private final Random forestRng = new Random(System.nanoTime());
+    private double forestAccumulatorSeconds = 0;
+
     public Map(int width, int height) {
         this.width = width;
         this.height = height;
@@ -51,7 +55,7 @@ public class Map {
     }
 
     private void spawnRandomForests() {
-        Random rng = new Random(System.nanoTime());
+        Random rng = forestRng;
         int forestPatches = 5 + rng.nextInt(6); // 5..10
 
         for (int i = 0; i < forestPatches; i++) {
@@ -97,15 +101,29 @@ public class Map {
         if (!inBounds(x, y)) return false;
         Tile t = getTile(x, y);
         if (t == null) return false;
-        return t.getType() == TileType.GRASS && !t.isOccupied();
+        return t.getType() == TileType.GRASS && !t.isOccupied() && t.getPlacedBuilding() == null;
     }
 
     private void setForestAt(int x, int y) {
         Tile t = getTile(x, y);
         if (t == null) return;
+        // Forest is still an empty field, just with trees.
         t.setType(TileType.FOREST);
-        t.setWalkable(false);
-        t.setOccupied(true);
+        if (t.getForestTrees() <= 0) {
+            t.setForestTrees(1 + forestRng.nextInt(4));
+        }
+        t.setWalkable(true);
+        t.setOccupied(false);
+    }
+
+    private void setForestAt(int x, int y, int trees) {
+        Tile t = getTile(x, y);
+        if (t == null) return;
+        t.setType(TileType.FOREST);
+        t.setForestTrees(trees);
+        t.setWalkable(true);
+        t.setOccupied(false);
+        t.setPlacedBuilding(null);
     }
 
     private void growForestPatch(int seedX, int seedY, int targetSize, Random rng) {
@@ -300,7 +318,82 @@ public class Map {
         }
     }
 
-    public void updateForests() {}
+    /**
+     * Forest simulation tick:
+     * - Trees can appear on empty grass tiles.
+     * - A forest tile can grow from 1..4 trees over time.
+     * - If a tile has 3 or 4 trees, it can spread to adjacent empty grass tiles.
+     */
+    public void updateForests(double deltaSeconds) {
+        if (deltaSeconds <= 0) return;
+        forestAccumulatorSeconds += deltaSeconds;
+        while (forestAccumulatorSeconds >= 1.0) {
+            forestAccumulatorSeconds -= 1.0;
+            forestStep1s();
+        }
+    }
+
+    private record ForestChange(int x, int y, int newTrees) {}
+
+    private void forestStep1s() {
+        // Probabilities are per-second.
+        // Slower growth: ~1/8 speed (half of the previous tuning).
+        double spontaneousSpawnP = 0.0000025; // any empty grass tile can sprout
+        double growP = 0.0125; // forest tile can gain +1 tree (until 4)
+        double spreadP = 0.01; // 3-4 tree tile can seed a neighbor
+
+        List<ForestChange> changes = new ArrayList<>();
+
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                Tile t = getTile(x, y);
+                if (t == null) continue;
+                if (t.getPlacedBuilding() != null) continue;
+                TileType type = t.getType();
+
+                if (type == TileType.GRASS) {
+                    if (!t.isOccupied() && forestRng.nextDouble() < spontaneousSpawnP) {
+                        changes.add(new ForestChange(x, y, 1));
+                    }
+                    continue;
+                }
+
+                if (type != TileType.FOREST) continue;
+
+                int trees = Math.max(0, t.getForestTrees());
+                if (trees <= 0) trees = 1;
+
+                if (trees < 4 && forestRng.nextDouble() < growP) {
+                    changes.add(new ForestChange(x, y, trees + 1));
+                    trees++;
+                }
+
+                if (trees >= 3 && forestRng.nextDouble() < spreadP) {
+                    int dir = forestRng.nextInt(4);
+                    int nx = x + (dir == 0 ? 1 : dir == 1 ? -1 : 0);
+                    int ny = y + (dir == 2 ? 1 : dir == 3 ? -1 : 0);
+                    if (!inBounds(nx, ny)) continue;
+                    Tile nt = getTile(nx, ny);
+                    if (nt == null) continue;
+                    if (nt.getPlacedBuilding() != null) continue;
+                    if (nt.getType() == TileType.GRASS && !nt.isOccupied()) {
+                        changes.add(new ForestChange(nx, ny, 1));
+                    }
+                }
+            }
+        }
+
+        // Apply changes (avoid overwriting roads/buildings).
+        for (ForestChange c : changes) {
+            if (!inBounds(c.x, c.y)) continue;
+            Tile t = getTile(c.x, c.y);
+            if (t == null) continue;
+            if (t.getPlacedBuilding() != null) continue;
+            if (t.getType() != TileType.GRASS && t.getType() != TileType.FOREST) continue;
+            if (t.isOccupied()) continue;
+            setForestAt(c.x, c.y, c.newTrees);
+        }
+    }
 
     /**
      * Player-built building placement.
@@ -418,6 +511,7 @@ public class Map {
         if (tile == null) return false;
         if (tile.getType() != TileType.FOREST) return false;
 
+        tile.setForestTrees(0);
         tile.setType(TileType.GRASS);
         tile.setWalkable(true);
         tile.setOccupied(false);
@@ -673,9 +767,17 @@ public class Map {
 
         Tile tile = getTile(x, y);
 
-        // Csak üres füves mezőre lehet utat építeni
-        if (tile.getType() != TileType.GRASS || tile.isOccupied()) {
+        // Only on empty GRASS or FOREST tiles.
+        // FOREST is allowed (clearing happens implicitly).
+        if (tile.isOccupied() || tile.getPlacedBuilding() != null) {
             return false;
+        }
+        if (tile.getType() != TileType.GRASS && tile.getType() != TileType.FOREST) {
+            return false;
+        }
+
+        if (tile.getType() == TileType.FOREST) {
+            tile.setForestTrees(0);
         }
 
         // Út létrehozása

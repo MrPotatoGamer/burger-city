@@ -32,6 +32,8 @@ public class GameUI extends JFrame {
     private static final int BUILDING_COST = 1000;
     private static final int INDUSTRY_COST = 1000;
 
+    private static final int ROAD_CLEAR_COST_PER_TREE = 25;
+
     private MapRenderer mapRenderer;
     private Map map;
     private Player player;
@@ -567,19 +569,30 @@ public class GameUI extends JFrame {
         int tileX = (int) (worldX / tileSize);
         int tileY = (int) (worldY / tileSize);
 
+        Tile target = map.getTile(tileX, tileY);
+        if (target == null) return;
+
+        int cost = Road.COST;
+        boolean clearing = false;
+        if (target.getType() == TileType.FOREST) {
+            clearing = true;
+            cost += ROAD_CLEAR_COST_PER_TREE * Math.max(1, target.getForestTrees());
+        }
+
         // Ellenőrzés: van-e elég pénz
-        if (!player.spendMoney(Road.COST)) {
-            updateStatus("Nincs elég pénz az út építéséhez! Szükséges: " + Road.COST + "$");
+        if (!player.spendMoney(cost)) {
+            updateStatus("Nincs elég pénz az út építéséhez! Szükséges: " + cost + "$");
             return;
         }
 
         // Út építése
         if (map.buildRoad(tileX, tileY)) {
             mapRenderer.repaint();
-            updateStatus("Út sikeresen megépítve (" + tileX + ", " + tileY + "). Pénz: " + player.getMoney() + "$");
+            updateStatus("Út sikeresen megépítve" + (clearing ? " (irtás)" : "") +
+                    " (" + tileX + ", " + tileY + "). Pénz: " + player.getMoney() + "$");
         } else {
             // Ha nem sikerült, visszaadjuk a pénzt
-            player.addMoney(Road.COST);
+            player.addMoney(cost);
             updateStatus("Erre a mezőre nem építhető út!");
         }
     }
@@ -1117,6 +1130,7 @@ public class GameUI extends JFrame {
         // Only update game logic if not paused (gameDeltaSeconds will be 0 when paused)
         if (!timeManager.isPaused()) {
             map.updateEconomy(gameDeltaSeconds);
+            map.updateForests(gameDeltaSeconds);
 
             // Check and remove invalid traffic lights
             removeInvalidTrafficLights();

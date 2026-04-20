@@ -11,6 +11,10 @@ public class Tile {
     private TileType type;
     private Building placedBuilding;
 
+    // Forest state: how many trees are on this tile (0..4).
+    // Only meaningful when type == FOREST.
+    private int forestTrees;
+
     public Tile(int x, int y, TileType type) {
         this.x = x;
         this.y = y;
@@ -18,12 +22,18 @@ public class Tile {
         this.isWalkable = (type == TileType.GRASS);
         this.isOccupied = false;
         this.placedBuilding = null;
+        this.forestTrees = 0;
     }
 
     public int getX() { return x; }
     public int getY() { return y; }
     public TileType getType() { return type; }
-    public void setType(TileType type) { this.type = type; }
+    public void setType(TileType type) {
+        this.type = type;
+        if (type != TileType.FOREST) {
+            this.forestTrees = 0;
+        }
+    }
     public boolean isWalkable() { return isWalkable; }
     public void setWalkable(boolean walkable) { isWalkable = walkable; }
     public boolean isOccupied() { return isOccupied; }
@@ -35,5 +45,18 @@ public class Tile {
 
     public void setPlacedBuilding(Building placedBuilding) {
         this.placedBuilding = placedBuilding;
+    }
+
+    public int getForestTrees() {
+        return forestTrees;
+    }
+
+    public void setForestTrees(int forestTrees) {
+        this.forestTrees = Math.max(0, Math.min(4, forestTrees));
+        if (this.forestTrees > 0) {
+            this.type = TileType.FOREST;
+        } else if (this.type == TileType.FOREST) {
+            this.type = TileType.GRASS;
+        }
     }
 }
