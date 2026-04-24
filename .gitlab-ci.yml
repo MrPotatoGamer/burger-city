@@ -49,13 +49,13 @@ test:
       fi
   artifacts:
     paths:
-      - BurgerCity/target/surefire-reports/
-      - BurgerCity/target/site/jacoco/
+      - target/surefire-reports/
+      - target/site/jacoco/
     reports:
-      junit: BurgerCity/target/surefire-reports/*.xml
+      junit: target/surefire-reports/*.xml
       coverage_report:
         coverage_format: jacoco
-        path: BurgerCity/target/site/jacoco/jacoco.xml
+        path: target/site/jacoco/jacoco.xml
   coverage: '/TOTAL_COVERAGE=(\d+)%/'
 
 code_quality_java:
