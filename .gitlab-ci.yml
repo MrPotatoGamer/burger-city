@@ -35,7 +35,6 @@ test:
   script:
     - cd BurgerCity
     - mvn clean verify
-    - ls -R
     - apt-get update -yqq && apt-get install -yqq libxml2-utils
     - |
       FILE="target/site/jacoco/jacoco.xml"
@@ -50,13 +49,13 @@ test:
       fi
   artifacts:
     paths:
-      - target/surefire-reports/
-      - target/site/jacoco/
+      - BurgerCity/target/surefire-reports/
+      - BurgerCity/target/site/jacoco/
     reports:
-      junit: target/surefire-reports/*.xml
+      junit: BurgerCity/target/surefire-reports/*.xml
       coverage_report:
         coverage_format: jacoco
-        path: target/site/jacoco/jacoco.xml
+        path: BurgerCity/target/site/jacoco/jacoco.xml
   coverage: '/TOTAL_COVERAGE=(\d+)%/'
 
 code_quality_java:
