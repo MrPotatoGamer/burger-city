@@ -59,8 +59,10 @@ test:
   coverage: '/TOTAL_COVERAGE=(\d+)%/'
 
 code_quality_java:
-  variables:
-    MAVEN_POM_FILE: BurgerCity/pom.xml
+  before_script:
+    - cd BurgerCity
+  after_script:
+    - ln -s BurgerCity/target target || true
 # Documentation
 
 
