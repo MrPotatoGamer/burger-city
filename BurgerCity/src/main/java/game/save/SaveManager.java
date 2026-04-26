@@ -15,6 +15,8 @@ import game.resource.Resource;
 import game.resource.ResourceInventory;
 import game.resource.ResourceType;
 import game.save.json.Json;
+import game.vehicle.AdvancedBus;
+import game.vehicle.AdvancedTruck;
 import game.vehicle.Bus;
 import game.vehicle.Truck;
 import game.vehicle.Vehicle;
@@ -86,9 +88,19 @@ public class SaveManager {
                                List<TrafficLight> trafficLights) throws IOException {
         ensureDir();
 
+        String normalizedName = saveName == null ? "" : saveName.trim();
+        if (normalizedName.isEmpty()) normalizedName = "save";
+
+        for (SaveGame existing : listSaves()) {
+            String existingName = existing.getSaveName();
+            if (existingName != null && existingName.trim().equalsIgnoreCase(normalizedName)) {
+                throw new IllegalArgumentException("Már létezik ilyen nevű mentés: " + normalizedName);
+            }
+        }
+
         long now = System.currentTimeMillis();
         String id = UUID.randomUUID().toString();
-        String safeName = sanitizeFileComponent(saveName);
+        String safeName = sanitizeFileComponent(normalizedName);
         String stamp = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
             .withLocale(Locale.ROOT)
             .withZone(ZoneId.systemDefault())
@@ -96,11 +108,11 @@ public class SaveManager {
         String fileName = stamp + "_" + safeName + "_" + id.substring(0, 8) + ".json";
         Path path = savesDir.resolve(fileName);
 
-        GameSnapshot snapshot = capture(saveName, now, map, player, timeManager, vehicles, trafficLights);
+        GameSnapshot snapshot = capture(normalizedName, now, map, player, timeManager, vehicles, trafficLights);
         Map<String, Object> jsonObj = snapshotToJson(id, snapshot);
         Files.writeString(path, Json.stringify(jsonObj), StandardCharsets.UTF_8);
 
-        return new SaveGame(id, saveName, now, fileName);
+        return new SaveGame(id, normalizedName, now, fileName);
     }
 
     public GameSnapshot loadSnapshot(SaveGame save) throws IOException {
@@ -149,9 +161,17 @@ public class SaveManager {
         if (snapshot.vehicles() != null) {
             for (GameSnapshot.VehicleData vd : snapshot.vehicles()) {
                 if (vd == null) continue;
-                Vehicle v = switch (vd.kind()) {
-                    case "Bus", "BUS" -> new Bus();
-                    case "Truck", "TRUCK" -> new Truck();
+                // `kind` is stored as the vehicle class simple name by Vehicle.exportSaveData().
+                // Be permissive for older/hand-edited saves (case/spacing/underscores).
+                String rawKind = vd.kind();
+                String kind = (rawKind == null) ? "" : rawKind.trim();
+                String norm = kind.replaceAll("[\\s_-]+", "").toLowerCase(Locale.ROOT);
+
+                Vehicle v = switch (norm) {
+                    case "bus" -> new Bus();
+                    case "truck" -> new Truck();
+                    case "advancedbus" -> new AdvancedBus();
+                    case "advancedtruck" -> new AdvancedTruck();
                     default -> {
                         // Unknown kind fallback to Truck.
                         yield new Truck();
@@ -223,15 +243,30 @@ public class SaveManager {
             }
         }
 
-        // Forests (restore last, so it won't interfere with build constraints)
+        // Forests (restore after roads/buildings so we don't block building placement)
         if (data.forests() != null) {
-            for (GameSnapshot.ForestTileData fd : data.forests()) {
-                if (fd == null) continue;
-                map.setForestForLoad(fd.x(), fd.y(), fd.trees());
+            for (GameSnapshot.ForestData f : data.forests()) {
+                if (f == null) continue;
+                applyForestIfPossible(map, f.x(), f.y(), f.trees());
             }
         }
 
         return map;
+    }
+
+    private static void applyForestIfPossible(game.map.Map map, int x, int y, int trees) {
+        if (map == null) return;
+        Tile tile = map.getTile(x, y);
+        if (tile == null) return;
+        if (tile.getPlacedBuilding() != null) return;
+        if (tile.isOccupied()) return;
+        if (tile.getType() != TileType.GRASS && tile.getType() != TileType.FOREST) return;
+
+        int clamped = Math.max(1, Math.min(4, trees));
+        tile.setForestTrees(clamped);
+        tile.setWalkable(true);
+        tile.setOccupied(false);
+        tile.setPlacedBuilding(null);
     }
 
     private static void restoreInventory(ResourceInventory inv, Map<ResourceType, Integer> items) {
@@ -316,7 +351,7 @@ public class SaveManager {
 
         List<GameSnapshot.IntPair> roads = new ArrayList<>();
         List<GameSnapshot.BuildingData> buildings = new ArrayList<>();
-        List<GameSnapshot.ForestTileData> forests = new ArrayList<>();
+        List<GameSnapshot.ForestData> forests = new ArrayList<>();
         for (int x = 0; x < map.getWidth(); x++) {
             for (int y = 0; y < map.getHeight(); y++) {
                 Tile tile = map.getTile(x, y);
@@ -330,8 +365,8 @@ public class SaveManager {
                     else if (b instanceof Stop) buildings.add(new GameSnapshot.BuildingData("Stop", x, y));
                 }
                 if (tile.getType() == TileType.FOREST) {
-                    int trees = Math.max(1, Math.min(4, tile.getForestTrees()));
-                    forests.add(new GameSnapshot.ForestTileData(x, y, trees));
+                    int trees = Math.max(1, tile.getForestTrees());
+                    forests.add(new GameSnapshot.ForestData(x, y, trees));
                 }
             }
         }
@@ -464,11 +499,8 @@ public class SaveManager {
         map.put("buildings", buildings);
 
         List<Object> forests = new ArrayList<>();
-        if (md.forests() != null) {
-            for (GameSnapshot.ForestTileData f : md.forests()) {
-                if (f == null) continue;
-                forests.add(List.of(f.x(), f.y(), f.trees()));
-            }
+        for (GameSnapshot.ForestData f : md.forests()) {
+            forests.add(List.of(f.x(), f.y(), f.trees()));
         }
         map.put("forests", forests);
 
@@ -660,22 +692,23 @@ public class SaveManager {
             }
         }
 
-        List<GameSnapshot.ForestTileData> forests = new ArrayList<>();
+        List<GameSnapshot.ForestData> forests = new ArrayList<>();
         Object fObj = mapObj.get("forests");
         if (fObj instanceof List<?> list) {
             for (Object item : list) {
+                // Accept either [x,y,trees] (preferred) or {x,y,trees}
                 if (item instanceof List<?> arr) {
                     if (arr.size() < 2) continue;
                     int x = (int) asLong(arr.get(0), 0L);
                     int y = (int) asLong(arr.get(1), 0L);
                     int trees = (arr.size() >= 3) ? (int) asLong(arr.get(2), 1L) : 1;
-                    forests.add(new GameSnapshot.ForestTileData(x, y, trees));
+                    if (trees > 0) forests.add(new GameSnapshot.ForestData(x, y, trees));
                 } else if (item instanceof Map<?, ?> m) {
                     Map<String, Object> o = (Map<String, Object>) m;
                     int x = (int) asLong(o.get("x"), 0L);
                     int y = (int) asLong(o.get("y"), 0L);
                     int trees = (int) asLong(o.get("trees"), 1L);
-                    forests.add(new GameSnapshot.ForestTileData(x, y, trees));
+                    if (trees > 0) forests.add(new GameSnapshot.ForestData(x, y, trees));
                 }
             }
         }

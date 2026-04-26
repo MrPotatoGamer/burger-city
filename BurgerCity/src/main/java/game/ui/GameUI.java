@@ -78,6 +78,8 @@ public class GameUI extends JFrame {
 
     private final SaveManager saveManager = new SaveManager();
 
+    private String currentSaveName;
+
     private JButton saveGameButton;
     private JButton loadGameButton;
 
@@ -94,7 +96,12 @@ public class GameUI extends JFrame {
     private static final int INITIAL_WINDOW_HEIGHT = 720;
 
     public GameUI() {
-        this(null);
+        this((GameSnapshot) null);
+    }
+
+    public GameUI(String initialSaveName) {
+        this((GameSnapshot) null);
+        this.currentSaveName = normalizeSaveName(initialSaveName);
     }
 
     public GameUI(GameSnapshot snapshot) {
@@ -267,17 +274,61 @@ public class GameUI extends JFrame {
     }
 
     private void saveGame() {
-        String saveName = JOptionPane.showInputDialog(this, "Mentés neve:", "Játék mentése", JOptionPane.PLAIN_MESSAGE);
-        if (saveName == null) return;
-        saveName = saveName.trim();
-        if (saveName.isEmpty()) saveName = "save";
+        String proposed = currentSaveName;
+        while (true) {
+            if (proposed == null) {
+                proposed = JOptionPane.showInputDialog(this, "Mentés neve:", "Játék mentése", JOptionPane.PLAIN_MESSAGE);
+                if (proposed == null) return;
+            }
 
-        try {
-            SaveGame sg = saveManager.createSave(saveName, map, player, timeManager, vehicles, trafficLights);
-            updateStatus("Mentés elkészült: " + sg.getSaveName());
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Mentés sikertelen: " + ex.getMessage(), "Hiba", JOptionPane.ERROR_MESSAGE);
+            String saveName = normalizeSaveName(proposed);
+            if (saveName == null) saveName = "save";
+
+            if (isSaveNameTaken(saveName)) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Már létezik ilyen nevű mentés: " + saveName + "\nAdj meg másik nevet.",
+                        "Mentés",
+                        JOptionPane.WARNING_MESSAGE
+                );
+                proposed = null;
+                continue;
+            }
+
+            try {
+                SaveGame sg = saveManager.createSave(saveName, map, player, timeManager, vehicles, trafficLights);
+                currentSaveName = normalizeSaveName(sg.getSaveName());
+                updateStatus("Mentés elkészült: " + sg.getSaveName());
+                return;
+            } catch (IllegalArgumentException ex) {
+                // Duplicate name (or other validation) coming from SaveManager.
+                JOptionPane.showMessageDialog(this, ex.getMessage(), "Mentés", JOptionPane.WARNING_MESSAGE);
+                proposed = null;
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Mentés sikertelen: " + ex.getMessage(), "Hiba", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
         }
+    }
+
+    private boolean isSaveNameTaken(String saveName) {
+        String normalized = normalizeSaveName(saveName);
+        if (normalized == null) return false;
+        try {
+            for (SaveGame sg : saveManager.listSaves()) {
+                String existing = normalizeSaveName(sg.getSaveName());
+                if (existing != null && existing.equalsIgnoreCase(normalized)) return true;
+            }
+        } catch (Exception ignored) {
+            // If we can't list saves, don't block saving here; SaveManager will still validate.
+        }
+        return false;
+    }
+
+    private static String normalizeSaveName(String name) {
+        if (name == null) return null;
+        String trimmed = name.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private void loadGame() {
@@ -1121,10 +1172,9 @@ public class GameUI extends JFrame {
         boolean nowVisible = dashboard.toggleVisibility();
         toggleDashboardButton.setText(nowVisible ? "Dashboard \u25C0" : "Dashboard \u25B6");
 
-        // Resize window to accommodate or reclaim dashboard space
-        int width = nowVisible ? INITIAL_WINDOW_WIDTH + 310 : INITIAL_WINDOW_WIDTH;
-        setSize(width, getHeight());
+        // Do not resize the window; only relayout content.
         revalidate();
+        repaint();
     }
 
     private void tick() {

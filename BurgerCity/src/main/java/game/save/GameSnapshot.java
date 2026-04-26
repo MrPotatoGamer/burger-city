@@ -35,11 +35,14 @@ public record GameSnapshot(
             List<IndustryData> industries,
             List<IntPair> roads,
             List<BuildingData> buildings,
-            List<ForestTileData> forests
+            List<ForestData> forests
     ) {}
 
-    
-    public record ForestTileData(int x, int y, int trees) {}
+    /**
+     * Forest tile state (FOREST type + tree count).
+     * Trees are clamped to 0..4; values <=0 are treated as "no forest".
+     */
+    public record ForestData(int x, int y, int trees) {}
 
     public record CityData(
             String name,
