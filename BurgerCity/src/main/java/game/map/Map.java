@@ -410,7 +410,8 @@ public class Map {
         // Special case: TrafficLight can only be built on road intersections
         if (building instanceof game.building.TrafficLight) {
             if (tile.getType() != TileType.ROAD) return false;
-            if (tile.isOccupied() && tile.getType() != TileType.ROAD) return false; // Can't build if already has a traffic light
+            // Don't allow overwriting an existing traffic light (or any other placed building on this road tile).
+            if (tile.isOccupied() || tile.getPlacedBuilding() != null) return false;
 
             // Check if it's an intersection (3 or 4 road neighbors)
             int roadNeighbors = countRoadNeighbors(x, y);
