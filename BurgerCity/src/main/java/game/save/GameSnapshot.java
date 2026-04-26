@@ -22,7 +22,7 @@ public record GameSnapshot(
         List<TrafficLightData> trafficLights
 ) {
 
-    public static final int CURRENT_VERSION = 1;
+        public static final int CURRENT_VERSION = 2;
 
     public record PlayerData(int money) {}
 
@@ -34,8 +34,12 @@ public record GameSnapshot(
             List<CityData> cities,
             List<IndustryData> industries,
             List<IntPair> roads,
-            List<BuildingData> buildings
+            List<BuildingData> buildings,
+            List<ForestTileData> forests
     ) {}
+
+    
+    public record ForestTileData(int x, int y, int trees) {}
 
     public record CityData(
             String name,
