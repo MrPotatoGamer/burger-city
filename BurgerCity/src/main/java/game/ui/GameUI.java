@@ -1121,10 +1121,9 @@ public class GameUI extends JFrame {
         boolean nowVisible = dashboard.toggleVisibility();
         toggleDashboardButton.setText(nowVisible ? "Dashboard \u25C0" : "Dashboard \u25B6");
 
-        // Resize window to accommodate or reclaim dashboard space
-        int width = nowVisible ? INITIAL_WINDOW_WIDTH + 310 : INITIAL_WINDOW_WIDTH;
-        setSize(width, getHeight());
+        // Do not resize the window; only relayout content.
         revalidate();
+        repaint();
     }
 
     private void tick() {
