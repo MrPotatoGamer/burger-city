@@ -39,6 +39,25 @@ public class Map {
         initGrass();
     }
 
+    /**
+     * Restores a forest tile during save/load reconstruction.
+     * Forest tiles are walkable and unoccupied, with a stored tree count (1..4).
+     */
+    public boolean setForestForLoad(int x, int y, int trees) {
+        if (!inBounds(x, y)) return false;
+        Tile t = getTile(x, y);
+        if (t == null) return false;
+        if (t.getPlacedBuilding() != null) return false;
+        if (t.isOccupied()) return false;
+
+        // Only restore onto base terrain.
+        if (t.getType() != TileType.GRASS && t.getType() != TileType.FOREST) return false;
+
+        int clampedTrees = Math.max(1, Math.min(4, trees));
+        setForestAt(x, y, clampedTrees);
+        return true;
+    }
+
     /** Előre definiált térkép betöltése */
     public void loadPredefined() {
         initGrass();
