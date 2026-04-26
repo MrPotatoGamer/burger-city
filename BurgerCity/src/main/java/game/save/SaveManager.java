@@ -15,6 +15,8 @@ import game.resource.Resource;
 import game.resource.ResourceInventory;
 import game.resource.ResourceType;
 import game.save.json.Json;
+import game.vehicle.AdvancedBus;
+import game.vehicle.AdvancedTruck;
 import game.vehicle.Bus;
 import game.vehicle.Truck;
 import game.vehicle.Vehicle;
@@ -149,9 +151,17 @@ public class SaveManager {
         if (snapshot.vehicles() != null) {
             for (GameSnapshot.VehicleData vd : snapshot.vehicles()) {
                 if (vd == null) continue;
-                Vehicle v = switch (vd.kind()) {
-                    case "Bus", "BUS" -> new Bus();
-                    case "Truck", "TRUCK" -> new Truck();
+                // `kind` is stored as the vehicle class simple name by Vehicle.exportSaveData().
+                // Be permissive for older/hand-edited saves (case/spacing/underscores).
+                String rawKind = vd.kind();
+                String kind = (rawKind == null) ? "" : rawKind.trim();
+                String norm = kind.replaceAll("[\\s_-]+", "").toLowerCase(Locale.ROOT);
+
+                Vehicle v = switch (norm) {
+                    case "bus" -> new Bus();
+                    case "truck" -> new Truck();
+                    case "advancedbus" -> new AdvancedBus();
+                    case "advancedtruck" -> new AdvancedTruck();
                     default -> {
                         // Unknown kind fallback to Truck.
                         yield new Truck();
