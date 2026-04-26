@@ -6,7 +6,7 @@ public class Bus extends Vehicle {
 
 	public Bus() {
 		super();
-		this.speed = 3;
+		this.speed = 2;
 		this.capacity = 30;
 		this.maintenanceCost = 2;
 	}

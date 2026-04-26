@@ -1,6 +1,8 @@
 package game.ui;
 
 import game.map.*;
+import game.vehicle.AdvancedBus;
+import game.vehicle.AdvancedTruck;
 import game.vehicle.Bus;
 import game.vehicle.Truck;
 import game.vehicle.Vehicle;
@@ -31,7 +33,9 @@ public class MapRenderer extends JPanel {
     private TexturePaint grassBackgroundPaint;
     private BufferedImage cityTexture;
     private BufferedImage truckTexture;
+    private BufferedImage advancedTruckTexture;
     private BufferedImage busTexture;
+    private BufferedImage advancedBusTexture;
     private BufferedImage wheatTexture;
     private BufferedImage bakeryTexture;
     private BufferedImage burgerFactoryTexture;
@@ -117,6 +121,18 @@ public class MapRenderer extends JPanel {
             System.err.println("Nem sikerült betölteni a truck textúrát: " + e.getMessage());
             truckTexture = null;
         }
+        try {
+            BufferedImage advanced_originalTruck = loadImageResource("/game/assets/advanced_truck.png");
+            int vehicleSize = TILE_SIZE;
+            advancedTruckTexture = new BufferedImage(vehicleSize, vehicleSize, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = advancedTruckTexture.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(advanced_originalTruck, 0, 0, vehicleSize, vehicleSize, null);
+            g.dispose();
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni az advanced truck textúrát: " + e.getMessage());
+            truckTexture = null;
+        }
 
         // Bus textúra betöltése és előre skálázása
         try {
@@ -129,6 +145,19 @@ public class MapRenderer extends JPanel {
             g.dispose();
         } catch (IOException e) {
             System.err.println("Nem sikerült betölteni a bus textúrát: " + e.getMessage());
+            busTexture = null;
+        }
+
+        try {
+            BufferedImage advanced_originalBus = loadImageResource("/game/assets/advanced_bus.png");
+            int vehicleSize = TILE_SIZE;
+            advancedBusTexture = new BufferedImage(vehicleSize, vehicleSize, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = advancedBusTexture.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(advanced_originalBus, 0, 0, vehicleSize, vehicleSize, null);
+            g.dispose();
+        } catch (IOException e) {
+            System.err.println("Nem sikerült betölteni az advanced bus textúrát: " + e.getMessage());
             busTexture = null;
         }
 
@@ -365,7 +394,13 @@ public class MapRenderer extends JPanel {
                 fallbackColor = Color.RED;
             } else if (v instanceof Bus) {
                 vehicleImage = busTexture;
-                fallbackColor = Color.BLUE;
+                fallbackColor = Color.YELLOW;
+            } else if (v instanceof AdvancedBus) {
+                vehicleImage = advancedBusTexture;
+                fallbackColor = Color.RED;
+            } else if (v instanceof AdvancedTruck) {
+                vehicleImage = advancedTruckTexture;
+                fallbackColor = Color.GREEN;
             }
 
             if (vehicleImage != null) {

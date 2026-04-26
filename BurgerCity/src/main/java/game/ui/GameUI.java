@@ -15,6 +15,8 @@ import game.map.TileType;
 import game.save.GameSnapshot;
 import game.save.SaveGame;
 import game.save.SaveManager;
+import game.vehicle.AdvancedBus;
+import game.vehicle.AdvancedTruck;
 import game.vehicle.Bus;
 import game.vehicle.Truck;
 import game.vehicle.Vehicle;
@@ -878,7 +880,7 @@ public class GameUI extends JFrame {
             return;
         }
 
-        Object[] options = {"Bus", "Truck"};
+        Object[] options = {"Bus", "Truck", "Advanced Bus", "Advanced Truck"};
         int choice = JOptionPane.showOptionDialog(
                 this,
                 "Válassz jármű típust:",
@@ -890,21 +892,27 @@ public class GameUI extends JFrame {
                 options[0]
         );
 
-        if (choice != 0 && choice != 1) {
+        if (choice < 0 || choice > 3) {
             player.addMoney(VEHICLE_COST);
             updateStatus("Jármű vásárlás megszakítva.");
             return;
         }
 
         // Assignment-aligned constraint: bus transports passengers between cities.
-        if (choice == 0 && (!isCityBuilding(startBuilding) || !isCityBuilding(endBuilding))) {
+        if ((choice == 0 || choice == 2) && (!isCityBuilding(startBuilding) || !isCityBuilding(endBuilding))) {
             player.addMoney(VEHICLE_COST);
             updateStatus("Bus csak két város között vásárolható (utas szállítás). Válassz 2 várost!");
             clearVehicleSelection();
             return;
         }
 
-        Vehicle v = (choice == 0) ? new Bus() : new Truck();
+        Vehicle v = switch (choice) {
+            case 0 -> new Bus();
+            case 1 -> new Truck();
+            case 2 -> new AdvancedBus();
+            case 3 -> new AdvancedTruck();
+            default -> new Bus();
+        };
         v.setHomeGarage(selectedGarage);
         v.setPurchasePrice(VEHICLE_COST);
         v.setRoutePath(path);
