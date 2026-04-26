@@ -56,7 +56,7 @@ public class Map {
 
     private void spawnRandomForests() {
         Random rng = forestRng;
-        int forestPatches = 5 + rng.nextInt(6); // 5..10
+        int forestPatches = 3 + rng.nextInt(4); // 3..6
 
         for (int i = 0; i < forestPatches; i++) {
             int attempts = 900;
