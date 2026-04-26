@@ -1,6 +1,8 @@
 package game.ui;
 
 import game.map.*;
+import game.vehicle.AdvancedBus;
+import game.vehicle.AdvancedTruck;
 import game.vehicle.Bus;
 import game.vehicle.Truck;
 import game.vehicle.Vehicle;
@@ -365,7 +367,13 @@ public class MapRenderer extends JPanel {
                 fallbackColor = Color.RED;
             } else if (v instanceof Bus) {
                 vehicleImage = busTexture;
-                fallbackColor = Color.BLUE;
+                fallbackColor = Color.YELLOW;
+            } else if (v instanceof AdvancedBus) {
+                vehicleImage = busTexture;
+                fallbackColor = Color.RED;
+            } else if (v instanceof AdvancedTruck) {
+                vehicleImage = truckTexture;
+                fallbackColor = Color.GREEN;
             }
 
             if (vehicleImage != null) {
