@@ -229,7 +229,7 @@ public class MainMenuUI extends JFrame {
             // Close main menu and start game
             dispose();
             SwingUtilities.invokeLater(() -> {
-                GameUI gameUI = new GameUI();
+                GameUI gameUI = new GameUI(gameName);
                 gameUI.setVisible(true);
             });
         }

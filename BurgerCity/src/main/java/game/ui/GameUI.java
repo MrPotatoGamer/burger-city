@@ -78,6 +78,8 @@ public class GameUI extends JFrame {
 
     private final SaveManager saveManager = new SaveManager();
 
+    private String currentSaveName;
+
     private JButton saveGameButton;
     private JButton loadGameButton;
 
@@ -94,7 +96,12 @@ public class GameUI extends JFrame {
     private static final int INITIAL_WINDOW_HEIGHT = 720;
 
     public GameUI() {
-        this(null);
+        this((GameSnapshot) null);
+    }
+
+    public GameUI(String initialSaveName) {
+        this((GameSnapshot) null);
+        this.currentSaveName = normalizeSaveName(initialSaveName);
     }
 
     public GameUI(GameSnapshot snapshot) {
@@ -267,17 +274,27 @@ public class GameUI extends JFrame {
     }
 
     private void saveGame() {
-        String saveName = JOptionPane.showInputDialog(this, "Mentés neve:", "Játék mentése", JOptionPane.PLAIN_MESSAGE);
-        if (saveName == null) return;
-        saveName = saveName.trim();
-        if (saveName.isEmpty()) saveName = "save";
+        String saveName = currentSaveName;
+        if (saveName == null) {
+            saveName = JOptionPane.showInputDialog(this, "Mentés neve:", "Játék mentése", JOptionPane.PLAIN_MESSAGE);
+            if (saveName == null) return;
+        }
+        saveName = normalizeSaveName(saveName);
+        if (saveName == null) saveName = "save";
 
         try {
             SaveGame sg = saveManager.createSave(saveName, map, player, timeManager, vehicles, trafficLights);
+            currentSaveName = normalizeSaveName(sg.getSaveName());
             updateStatus("Mentés elkészült: " + sg.getSaveName());
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Mentés sikertelen: " + ex.getMessage(), "Hiba", JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private static String normalizeSaveName(String name) {
+        if (name == null) return null;
+        String trimmed = name.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private void loadGame() {
