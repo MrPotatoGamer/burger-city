@@ -274,21 +274,55 @@ public class GameUI extends JFrame {
     }
 
     private void saveGame() {
-        String saveName = currentSaveName;
-        if (saveName == null) {
-            saveName = JOptionPane.showInputDialog(this, "Mentés neve:", "Játék mentése", JOptionPane.PLAIN_MESSAGE);
-            if (saveName == null) return;
-        }
-        saveName = normalizeSaveName(saveName);
-        if (saveName == null) saveName = "save";
+        String proposed = currentSaveName;
+        while (true) {
+            if (proposed == null) {
+                proposed = JOptionPane.showInputDialog(this, "Mentés neve:", "Játék mentése", JOptionPane.PLAIN_MESSAGE);
+                if (proposed == null) return;
+            }
 
-        try {
-            SaveGame sg = saveManager.createSave(saveName, map, player, timeManager, vehicles, trafficLights);
-            currentSaveName = normalizeSaveName(sg.getSaveName());
-            updateStatus("Mentés elkészült: " + sg.getSaveName());
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Mentés sikertelen: " + ex.getMessage(), "Hiba", JOptionPane.ERROR_MESSAGE);
+            String saveName = normalizeSaveName(proposed);
+            if (saveName == null) saveName = "save";
+
+            if (isSaveNameTaken(saveName)) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Már létezik ilyen nevű mentés: " + saveName + "\nAdj meg másik nevet.",
+                        "Mentés",
+                        JOptionPane.WARNING_MESSAGE
+                );
+                proposed = null;
+                continue;
+            }
+
+            try {
+                SaveGame sg = saveManager.createSave(saveName, map, player, timeManager, vehicles, trafficLights);
+                currentSaveName = normalizeSaveName(sg.getSaveName());
+                updateStatus("Mentés elkészült: " + sg.getSaveName());
+                return;
+            } catch (IllegalArgumentException ex) {
+                // Duplicate name (or other validation) coming from SaveManager.
+                JOptionPane.showMessageDialog(this, ex.getMessage(), "Mentés", JOptionPane.WARNING_MESSAGE);
+                proposed = null;
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Mentés sikertelen: " + ex.getMessage(), "Hiba", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
         }
+    }
+
+    private boolean isSaveNameTaken(String saveName) {
+        String normalized = normalizeSaveName(saveName);
+        if (normalized == null) return false;
+        try {
+            for (SaveGame sg : saveManager.listSaves()) {
+                String existing = normalizeSaveName(sg.getSaveName());
+                if (existing != null && existing.equalsIgnoreCase(normalized)) return true;
+            }
+        } catch (Exception ignored) {
+            // If we can't list saves, don't block saving here; SaveManager will still validate.
+        }
+        return false;
     }
 
     private static String normalizeSaveName(String name) {

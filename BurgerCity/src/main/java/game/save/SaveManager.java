@@ -88,9 +88,19 @@ public class SaveManager {
                                List<TrafficLight> trafficLights) throws IOException {
         ensureDir();
 
+        String normalizedName = saveName == null ? "" : saveName.trim();
+        if (normalizedName.isEmpty()) normalizedName = "save";
+
+        for (SaveGame existing : listSaves()) {
+            String existingName = existing.getSaveName();
+            if (existingName != null && existingName.trim().equalsIgnoreCase(normalizedName)) {
+                throw new IllegalArgumentException("Már létezik ilyen nevű mentés: " + normalizedName);
+            }
+        }
+
         long now = System.currentTimeMillis();
         String id = UUID.randomUUID().toString();
-        String safeName = sanitizeFileComponent(saveName);
+        String safeName = sanitizeFileComponent(normalizedName);
         String stamp = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
             .withLocale(Locale.ROOT)
             .withZone(ZoneId.systemDefault())
@@ -98,11 +108,11 @@ public class SaveManager {
         String fileName = stamp + "_" + safeName + "_" + id.substring(0, 8) + ".json";
         Path path = savesDir.resolve(fileName);
 
-        GameSnapshot snapshot = capture(saveName, now, map, player, timeManager, vehicles, trafficLights);
+        GameSnapshot snapshot = capture(normalizedName, now, map, player, timeManager, vehicles, trafficLights);
         Map<String, Object> jsonObj = snapshotToJson(id, snapshot);
         Files.writeString(path, Json.stringify(jsonObj), StandardCharsets.UTF_8);
 
-        return new SaveGame(id, saveName, now, fileName);
+        return new SaveGame(id, normalizedName, now, fileName);
     }
 
     public GameSnapshot loadSnapshot(SaveGame save) throws IOException {
