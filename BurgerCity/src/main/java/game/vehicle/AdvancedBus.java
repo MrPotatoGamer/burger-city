@@ -2,17 +2,17 @@ package game.vehicle;
 
 import game.resource.ResourceType;
 
-public class Truck extends Vehicle {
+public class AdvancedBus extends Vehicle {
 
-	public Truck() {
+	public AdvancedBus() {
 		super();
-		this.speed = 1;
-		this.capacity = 20;
+		this.speed = 3;
+		this.capacity = 50;
 		this.maintenanceCost = 3;
 	}
 
 	@Override
 	protected boolean canCarry(ResourceType type) {
-		return type != ResourceType.PASSENGERS;
+		return type == ResourceType.PASSENGERS;
 	}
 }

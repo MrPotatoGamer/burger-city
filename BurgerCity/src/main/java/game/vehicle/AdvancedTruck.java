@@ -2,13 +2,13 @@ package game.vehicle;
 
 import game.resource.ResourceType;
 
-public class Truck extends Vehicle {
+public class AdvancedTruck extends Vehicle {
 
-	public Truck() {
+	public AdvancedTruck() {
 		super();
-		this.speed = 1;
-		this.capacity = 20;
-		this.maintenanceCost = 3;
+		this.speed = 2;
+		this.capacity = 35;
+		this.maintenanceCost = 4;
 	}
 
 	@Override
