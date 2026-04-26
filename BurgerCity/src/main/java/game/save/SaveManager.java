@@ -233,7 +233,30 @@ public class SaveManager {
             }
         }
 
+        // Forests (restore after roads/buildings so we don't block building placement)
+        if (data.forests() != null) {
+            for (GameSnapshot.ForestData f : data.forests()) {
+                if (f == null) continue;
+                applyForestIfPossible(map, f.x(), f.y(), f.trees());
+            }
+        }
+
         return map;
+    }
+
+    private static void applyForestIfPossible(game.map.Map map, int x, int y, int trees) {
+        if (map == null) return;
+        Tile tile = map.getTile(x, y);
+        if (tile == null) return;
+        if (tile.getPlacedBuilding() != null) return;
+        if (tile.isOccupied()) return;
+        if (tile.getType() != TileType.GRASS && tile.getType() != TileType.FOREST) return;
+
+        int clamped = Math.max(1, Math.min(4, trees));
+        tile.setForestTrees(clamped);
+        tile.setWalkable(true);
+        tile.setOccupied(false);
+        tile.setPlacedBuilding(null);
     }
 
     private static void restoreInventory(ResourceInventory inv, Map<ResourceType, Integer> items) {
@@ -318,6 +341,7 @@ public class SaveManager {
 
         List<GameSnapshot.IntPair> roads = new ArrayList<>();
         List<GameSnapshot.BuildingData> buildings = new ArrayList<>();
+        List<GameSnapshot.ForestData> forests = new ArrayList<>();
         for (int x = 0; x < map.getWidth(); x++) {
             for (int y = 0; y < map.getHeight(); y++) {
                 Tile tile = map.getTile(x, y);
@@ -330,10 +354,14 @@ public class SaveManager {
                     if (b instanceof Garage) buildings.add(new GameSnapshot.BuildingData("Garage", x, y));
                     else if (b instanceof Stop) buildings.add(new GameSnapshot.BuildingData("Stop", x, y));
                 }
+                if (tile.getType() == TileType.FOREST) {
+                    int trees = Math.max(1, tile.getForestTrees());
+                    forests.add(new GameSnapshot.ForestData(x, y, trees));
+                }
             }
         }
 
-        GameSnapshot.MapData md = new GameSnapshot.MapData(map.getWidth(), map.getHeight(), cities, industries, roads, buildings);
+        GameSnapshot.MapData md = new GameSnapshot.MapData(map.getWidth(), map.getHeight(), cities, industries, roads, buildings, forests);
 
         // Vehicles
         List<GameSnapshot.VehicleData> vds = new ArrayList<>();
@@ -460,6 +488,12 @@ public class SaveManager {
         }
         map.put("buildings", buildings);
 
+        List<Object> forests = new ArrayList<>();
+        for (GameSnapshot.ForestData f : md.forests()) {
+            forests.add(List.of(f.x(), f.y(), f.trees()));
+        }
+        map.put("forests", forests);
+
         return map;
     }
 
@@ -578,7 +612,7 @@ public class SaveManager {
     @SuppressWarnings("unchecked")
     private static GameSnapshot.MapData mapFromJson(Map<String, Object> mapObj) {
         if (mapObj == null) {
-            return new GameSnapshot.MapData(50, 40, List.of(), List.of(), List.of(), List.of());
+            return new GameSnapshot.MapData(50, 40, List.of(), List.of(), List.of(), List.of(), List.of());
         }
 
         int w = (int) asLong(mapObj.get("width"), 50L);
@@ -648,7 +682,28 @@ public class SaveManager {
             }
         }
 
-        return new GameSnapshot.MapData(w, h, cities, industries, roads, buildings);
+        List<GameSnapshot.ForestData> forests = new ArrayList<>();
+        Object fObj = mapObj.get("forests");
+        if (fObj instanceof List<?> list) {
+            for (Object item : list) {
+                // Accept either [x,y,trees] (preferred) or {x,y,trees}
+                if (item instanceof List<?> arr) {
+                    if (arr.size() < 2) continue;
+                    int x = (int) asLong(arr.get(0), 0L);
+                    int y = (int) asLong(arr.get(1), 0L);
+                    int trees = (arr.size() >= 3) ? (int) asLong(arr.get(2), 1L) : 1;
+                    if (trees > 0) forests.add(new GameSnapshot.ForestData(x, y, trees));
+                } else if (item instanceof Map<?, ?> m) {
+                    Map<String, Object> o = (Map<String, Object>) m;
+                    int x = (int) asLong(o.get("x"), 0L);
+                    int y = (int) asLong(o.get("y"), 0L);
+                    int trees = (int) asLong(o.get("trees"), 1L);
+                    if (trees > 0) forests.add(new GameSnapshot.ForestData(x, y, trees));
+                }
+            }
+        }
+
+        return new GameSnapshot.MapData(w, h, cities, industries, roads, buildings, forests);
     }
 
     @SuppressWarnings("unchecked")

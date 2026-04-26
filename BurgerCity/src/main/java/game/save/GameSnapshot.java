@@ -22,7 +22,7 @@ public record GameSnapshot(
         List<TrafficLightData> trafficLights
 ) {
 
-    public static final int CURRENT_VERSION = 1;
+        public static final int CURRENT_VERSION = 2;
 
     public record PlayerData(int money) {}
 
@@ -34,8 +34,15 @@ public record GameSnapshot(
             List<CityData> cities,
             List<IndustryData> industries,
             List<IntPair> roads,
-            List<BuildingData> buildings
+            List<BuildingData> buildings,
+            List<ForestData> forests
     ) {}
+
+    /**
+     * Forest tile state (FOREST type + tree count).
+     * Trees are clamped to 0..4; values <=0 are treated as "no forest".
+     */
+    public record ForestData(int x, int y, int trees) {}
 
     public record CityData(
             String name,
