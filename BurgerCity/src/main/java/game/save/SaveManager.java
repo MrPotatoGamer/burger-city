@@ -152,7 +152,10 @@ public class SaveManager {
                 TrafficLight tl = new TrafficLight(td.x(), td.y());
                 tl.restore(td.state(), td.timeInState(), td.greenDurationMain(), td.greenDurationCross());
                 // Ensure it's on the map as a placed building.
-                map.buildBuilding(td.x(), td.y(), tl);
+                // Do not use gameplay validation during load (it can reject for unrelated reasons).
+                if (!map.placeBuildingForLoad(td.x(), td.y(), tl)) {
+                    System.err.println("[SaveManager] WARNING: Failed to restore TrafficLight at (" + td.x() + "," + td.y() + ")");
+                }
                 trafficLights.add(tl);
             }
         }
@@ -224,7 +227,9 @@ public class SaveManager {
         if (data.roads() != null) {
             for (GameSnapshot.IntPair p : data.roads()) {
                 if (p == null) continue;
-                map.buildRoad(p.x(), p.y());
+                if (!map.buildRoad(p.x(), p.y())) {
+                    System.err.println("[SaveManager] WARNING: Failed to restore road at (" + p.x() + "," + p.y() + ")");
+                }
             }
         }
 
@@ -238,7 +243,11 @@ public class SaveManager {
                     default -> null;
                 };
                 if (b != null) {
-                    map.buildBuilding(bd.x(), bd.y(), b);
+                    if (!map.placeBuildingForLoad(bd.x(), bd.y(), b)) {
+                        Tile t = map.getTile(bd.x(), bd.y());
+                        String tileType = (t == null || t.getType() == null) ? "?" : t.getType().name();
+                        System.err.println("[SaveManager] WARNING: Failed to restore building " + bd.type() + " at (" + bd.x() + "," + bd.y() + ") on tile " + tileType);
+                    }
                 }
             }
         }
