@@ -457,6 +457,42 @@ public class Map {
         return true;
     }
 
+    /**
+     * Save/load-only building placement.
+     * Bypasses normal gameplay validation (e.g. Garage road adjacency), but still refuses:
+     * - out-of-bounds tiles
+     * - city/industry footprint tiles
+     * - tiles that already have a placed building
+     */
+    public boolean placeBuildingForLoad(int x, int y, Building building) {
+        if (building == null) return false;
+        if (!inBounds(x, y)) return false;
+
+        Tile tile = getTile(x, y);
+        if (tile == null) return false;
+
+        // Never overwrite an existing placed building during load.
+        if (tile.getPlacedBuilding() != null) return false;
+
+        // Never place on city/industry footprint tiles.
+        if (tile.getType() == TileType.CITY || tile.getType() == TileType.INDUSTRY) return false;
+
+        if (building instanceof game.building.TrafficLight) {
+            // TrafficLight must live on a ROAD tile. If the save is inconsistent, refuse.
+            if (tile.getType() != TileType.ROAD) return false;
+            tile.setOccupied(true);
+            tile.setPlacedBuilding(building);
+            return true;
+        }
+
+        // Regular building tile.
+        tile.setType(TileType.BUILDING);
+        tile.setWalkable(false);
+        tile.setOccupied(true);
+        tile.setPlacedBuilding(building);
+        return true;
+    }
+
     private boolean hasAdjacentRoad(int x, int y) {
         return isRoadOnly(x, y - 1) || isRoadOnly(x + 1, y) || isRoadOnly(x, y + 1) || isRoadOnly(x - 1, y);
     }
