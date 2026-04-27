@@ -22,7 +22,7 @@ public record GameSnapshot(
         List<TrafficLightData> trafficLights
 ) {
 
-        public static final int CURRENT_VERSION = 2;
+        public static final int CURRENT_VERSION = 3;
 
     public record PlayerData(int money) {}
 
@@ -96,7 +96,23 @@ public record GameSnapshot(
             int pathIndex,
             boolean pathForward,
             CargoData cargo,
-            RouteBuildingsData routeBuildings
+            RouteBuildingsData routeBuildings,
+            List<IntPair> routePathTiles,
+            boolean rejoiningRoute,
+            Integer rejoinRouteAtX,
+            Integer rejoinRouteAtY,
+            double ageSeconds,
+            double secondsSinceMaintenance,
+            boolean goingToMaintenance,
+            boolean inMaintenance,
+            double maintenanceSecondsRemaining,
+            Integer maintenanceDestRoadX,
+            Integer maintenanceDestRoadY,
+            Integer homeGarageX,
+            Integer homeGarageY,
+            Integer maintenanceGarageX,
+            Integer maintenanceGarageY,
+            int purchasePrice
     ) {}
 
     public record IntPair(int x, int y) {}

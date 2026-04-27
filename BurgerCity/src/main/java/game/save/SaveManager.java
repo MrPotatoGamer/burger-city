@@ -178,7 +178,7 @@ public class SaveManager {
                     }
                 };
 
-                v.importSaveData(vd);
+                v.importSaveData(vd, map);
                 vehicles.add(v);
             }
         }
@@ -530,6 +530,41 @@ public class SaveManager {
         }
         o.put("pathTiles", tiles);
 
+        List<Object> routeTiles = new ArrayList<>();
+        if (v.routePathTiles() != null) {
+            for (GameSnapshot.IntPair p : v.routePathTiles()) {
+                if (p == null) continue;
+                routeTiles.add(List.of(p.x(), p.y()));
+            }
+        }
+        o.put("routePathTiles", routeTiles);
+
+        o.put("rejoiningRoute", v.rejoiningRoute());
+        o.put("rejoinRouteAtX", v.rejoinRouteAtX());
+        o.put("rejoinRouteAtY", v.rejoinRouteAtY());
+
+        o.put("ageSeconds", v.ageSeconds());
+        o.put("secondsSinceMaintenance", v.secondsSinceMaintenance());
+        o.put("goingToMaintenance", v.goingToMaintenance());
+        o.put("inMaintenance", v.inMaintenance());
+        o.put("maintenanceSecondsRemaining", v.maintenanceSecondsRemaining());
+        o.put("maintenanceDestRoadX", v.maintenanceDestRoadX());
+        o.put("maintenanceDestRoadY", v.maintenanceDestRoadY());
+
+        if (v.homeGarageX() != null && v.homeGarageY() != null) {
+            o.put("homeGarage", List.of(v.homeGarageX(), v.homeGarageY()));
+        } else {
+            o.put("homeGarage", null);
+        }
+
+        if (v.maintenanceGarageX() != null && v.maintenanceGarageY() != null) {
+            o.put("maintenanceGarage", List.of(v.maintenanceGarageX(), v.maintenanceGarageY()));
+        } else {
+            o.put("maintenanceGarage", null);
+        }
+
+        o.put("purchasePrice", v.purchasePrice());
+
         if (v.cargo() != null) {
             Map<String, Object> cargo = new LinkedHashMap<>();
             cargo.put("type", v.cargo().type().name());
@@ -747,6 +782,47 @@ public class SaveManager {
             }
         }
 
+        List<GameSnapshot.IntPair> routePathTiles = new ArrayList<>();
+        Object rptObj = o.get("routePathTiles");
+        if (rptObj instanceof List<?> list) {
+            for (Object item : list) {
+                if (!(item instanceof List<?> arr) || arr.size() < 2) continue;
+                int x = (int) asLong(arr.get(0), 0L);
+                int y = (int) asLong(arr.get(1), 0L);
+                routePathTiles.add(new GameSnapshot.IntPair(x, y));
+            }
+        }
+
+        boolean rejoiningRoute = asBoolean(o.get("rejoiningRoute"), false);
+        Integer rejoinRouteAtX = o.get("rejoinRouteAtX") == null ? null : (int) asLong(o.get("rejoinRouteAtX"), 0L);
+        Integer rejoinRouteAtY = o.get("rejoinRouteAtY") == null ? null : (int) asLong(o.get("rejoinRouteAtY"), 0L);
+
+        double ageSeconds = asDouble(o.get("ageSeconds"), 0.0);
+        double secondsSinceMaintenance = asDouble(o.get("secondsSinceMaintenance"), 0.0);
+        boolean goingToMaintenance = asBoolean(o.get("goingToMaintenance"), false);
+        boolean inMaintenance = asBoolean(o.get("inMaintenance"), false);
+        double maintenanceSecondsRemaining = asDouble(o.get("maintenanceSecondsRemaining"), 0.0);
+        Integer maintenanceDestRoadX = o.get("maintenanceDestRoadX") == null ? null : (int) asLong(o.get("maintenanceDestRoadX"), 0L);
+        Integer maintenanceDestRoadY = o.get("maintenanceDestRoadY") == null ? null : (int) asLong(o.get("maintenanceDestRoadY"), 0L);
+
+        Integer homeGarageX = null;
+        Integer homeGarageY = null;
+        Object hgObj = o.get("homeGarage");
+        if (hgObj instanceof List<?> arr && arr.size() >= 2) {
+            homeGarageX = (int) asLong(arr.get(0), 0L);
+            homeGarageY = (int) asLong(arr.get(1), 0L);
+        }
+
+        Integer maintenanceGarageX = null;
+        Integer maintenanceGarageY = null;
+        Object mgObj = o.get("maintenanceGarage");
+        if (mgObj instanceof List<?> arr && arr.size() >= 2) {
+            maintenanceGarageX = (int) asLong(arr.get(0), 0L);
+            maintenanceGarageY = (int) asLong(arr.get(1), 0L);
+        }
+
+        int purchasePrice = (int) asLong(o.get("purchasePrice"), 0L);
+
         GameSnapshot.CargoData cargo = null;
         Object cargoObj = o.get("cargo");
         if (cargoObj instanceof Map<?, ?> m) {
@@ -789,7 +865,23 @@ public class SaveManager {
                 pathIndex,
                 pathForward,
                 cargo,
-                rb
+            rb,
+            routePathTiles,
+            rejoiningRoute,
+            rejoinRouteAtX,
+            rejoinRouteAtY,
+            ageSeconds,
+            secondsSinceMaintenance,
+            goingToMaintenance,
+            inMaintenance,
+            maintenanceSecondsRemaining,
+            maintenanceDestRoadX,
+            maintenanceDestRoadY,
+            homeGarageX,
+            homeGarageY,
+            maintenanceGarageX,
+            maintenanceGarageY,
+            purchasePrice
         );
     }
 

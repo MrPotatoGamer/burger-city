@@ -166,14 +166,19 @@ public class Vehicle {
         this.rejoinRouteAtY = y;
     }
 
-    public GameSnapshot.VehicleData exportSaveData() {
+    private static List<GameSnapshot.IntPair> toIntPairs(List<int[]> tiles) {
         List<GameSnapshot.IntPair> pts = new ArrayList<>();
-        if (pathTiles != null) {
-            for (int[] p : pathTiles) {
-                if (p == null || p.length < 2) continue;
-                pts.add(new GameSnapshot.IntPair(p[0], p[1]));
-            }
+        if (tiles == null) return pts;
+        for (int[] p : tiles) {
+            if (p == null || p.length < 2) continue;
+            pts.add(new GameSnapshot.IntPair(p[0], p[1]));
         }
+        return pts;
+    }
+
+    public GameSnapshot.VehicleData exportSaveData() {
+        List<GameSnapshot.IntPair> pts = toIntPairs(pathTiles);
+        List<GameSnapshot.IntPair> routePts = toIntPairs(routePathTiles);
 
         GameSnapshot.CargoData cargoData = null;
         if (currentCargo != null && !currentCargo.isEmpty()) {
@@ -184,6 +189,11 @@ public class Vehicle {
         if (startBuildingOriginX != null && startBuildingOriginY != null && endBuildingOriginX != null && endBuildingOriginY != null) {
             rb = new GameSnapshot.RouteBuildingsData(startBuildingOriginX, startBuildingOriginY, endBuildingOriginX, endBuildingOriginY);
         }
+
+        Integer homeGarageX = (garage == null) ? null : garage.getX();
+        Integer homeGarageY = (garage == null) ? null : garage.getY();
+        Integer maintenanceGarageX = (maintenanceGarage == null) ? null : maintenanceGarage.getX();
+        Integer maintenanceGarageY = (maintenanceGarage == null) ? null : maintenanceGarage.getY();
 
         return new GameSnapshot.VehicleData(
                 getClass().getSimpleName(),
@@ -202,11 +212,31 @@ public class Vehicle {
                 pathIndex,
                 pathForward,
                 cargoData,
-                rb
+                rb,
+                routePts,
+                rejoiningRoute,
+                rejoinRouteAtX,
+                rejoinRouteAtY,
+                ageSeconds,
+                secondsSinceMaintenance,
+                goingToMaintenance,
+                inMaintenance,
+                maintenanceSecondsRemaining,
+                maintenanceDestRoadX,
+                maintenanceDestRoadY,
+                homeGarageX,
+                homeGarageY,
+                maintenanceGarageX,
+                maintenanceGarageY,
+                purchasePrice
         );
     }
 
     public void importSaveData(GameSnapshot.VehicleData data) {
+        importSaveData(data, null);
+    }
+
+    public void importSaveData(GameSnapshot.VehicleData data, Map map) {
         if (data == null) return;
 
         this.worldX = data.worldX();
@@ -233,6 +263,31 @@ public class Vehicle {
         this.pathIndex = Math.max(0, data.pathIndex());
         this.pathForward = data.pathForward();
 
+        // Route path
+        List<int[]> newRoute = new ArrayList<>();
+        if (data.routePathTiles() != null) {
+            for (GameSnapshot.IntPair p : data.routePathTiles()) {
+                if (p == null) continue;
+                newRoute.add(new int[]{p.x(), p.y()});
+            }
+        }
+        this.routePathTiles = newRoute;
+
+        // Route rejoin state
+        this.rejoiningRoute = data.rejoiningRoute();
+        this.rejoinRouteAtX = data.rejoinRouteAtX();
+        this.rejoinRouteAtY = data.rejoinRouteAtY();
+
+        // Economy/maintenance state
+        this.purchasePrice = Math.max(0, data.purchasePrice());
+        this.ageSeconds = Math.max(0.0, data.ageSeconds());
+        this.secondsSinceMaintenance = Math.max(0.0, data.secondsSinceMaintenance());
+        this.goingToMaintenance = data.goingToMaintenance();
+        this.inMaintenance = data.inMaintenance();
+        this.maintenanceSecondsRemaining = Math.max(0.0, data.maintenanceSecondsRemaining());
+        this.maintenanceDestRoadX = data.maintenanceDestRoadX();
+        this.maintenanceDestRoadY = data.maintenanceDestRoadY();
+
         // Cargo
         if (data.cargo() != null && data.cargo().type() != null && data.cargo().amount() > 0) {
             this.currentCargo = new Resource(data.cargo().type(), data.cargo().amount());
@@ -251,6 +306,24 @@ public class Vehicle {
             this.startBuildingOriginY = null;
             this.endBuildingOriginX = null;
             this.endBuildingOriginY = null;
+        }
+
+        // Resolve garages (object references do not survive serialization)
+        this.garage = null;
+        this.maintenanceGarage = null;
+        if (map != null) {
+            if (data.homeGarageX() != null && data.homeGarageY() != null) {
+                Tile t = map.getTile(data.homeGarageX(), data.homeGarageY());
+                if (t != null && t.getPlacedBuilding() instanceof Garage g) {
+                    this.garage = g;
+                }
+            }
+            if (data.maintenanceGarageX() != null && data.maintenanceGarageY() != null) {
+                Tile t = map.getTile(data.maintenanceGarageX(), data.maintenanceGarageY());
+                if (t != null && t.getPlacedBuilding() instanceof Garage g) {
+                    this.maintenanceGarage = g;
+                }
+            }
         }
 
         // Reset transient fields
