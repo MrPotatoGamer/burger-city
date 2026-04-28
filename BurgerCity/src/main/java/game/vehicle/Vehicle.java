@@ -792,6 +792,14 @@ public class Vehicle {
         int[] next = pathTiles.get(nextIndex);
         // Safety: only move onto ROAD.
         if (!isRoad(map, next[0], next[1])) {
+            // Road is missing! Try to recalculate the route
+            if (tryRecalculateRoute(map)) {
+                // Successfully recalculated, try again on next update
+                targetTileX = null;
+                targetTileY = null;
+                return;
+            }
+            // No valid route found, stop
             targetTileX = null;
             targetTileY = null;
             return;
@@ -1102,6 +1110,110 @@ public class Vehicle {
             int[] tile = pathTiles.get(idx);
             Industry industry = findAdjacentIndustry(map, tile[0], tile[1]);
             if (industry != null) return industry;
+        }
+        return null;
+    }
+
+    /**
+     * Try to recalculate the route when the current path is blocked.
+     * Finds all cities/industries along the original route and rebuilds the circular path.
+     * @return true if recalculation succeeded, false otherwise
+     */
+    private boolean tryRecalculateRoute(Map map) {
+        if (map == null) return false;
+        if (routePathTiles == null || routePathTiles.isEmpty()) return false;
+
+        // Find all unique buildings (cities/industries) along the original route
+        java.util.Set<String> seenBuildings = new java.util.HashSet<>();
+        java.util.List<Object> buildings = new java.util.ArrayList<>();
+
+        for (int[] tile : routePathTiles) {
+            City city = findAdjacentCity(map, tile[0], tile[1]);
+            if (city != null) {
+                String key = "city_" + city.getOriginX() + "_" + city.getOriginY();
+                if (!seenBuildings.contains(key)) {
+                    seenBuildings.add(key);
+                    buildings.add(city);
+                }
+            }
+
+            Industry industry = findAdjacentIndustry(map, tile[0], tile[1]);
+            if (industry != null) {
+                String key = "industry_" + industry.getOriginX() + "_" + industry.getOriginY();
+                if (!seenBuildings.contains(key)) {
+                    seenBuildings.add(key);
+                    buildings.add(industry);
+                }
+            }
+        }
+
+        // Need at least 2 buildings to make a route
+        if (buildings.size() < 2) return false;
+
+        // Try to rebuild the circular path between all buildings
+        java.util.List<int[]> newPath = new java.util.ArrayList<>();
+
+        for (int i = 0; i < buildings.size(); i++) {
+            Object current = buildings.get(i);
+            Object next = buildings.get((i + 1) % buildings.size());
+
+            int[] currentCoords = getBuildingCoords(current);
+            int[] currentSize = getBuildingSize(current);
+            int[] nextCoords = getBuildingCoords(next);
+            int[] nextSize = getBuildingSize(next);
+
+            if (currentCoords == null || nextCoords == null) return false;
+
+            java.util.List<int[]> segment = map.findRoadPathBetweenAreas(
+                currentCoords[0], currentCoords[1], currentSize[0], currentSize[1],
+                nextCoords[0], nextCoords[1], nextSize[0], nextSize[1]
+            );
+
+            if (segment == null || segment.isEmpty()) {
+                // Cannot find path between these buildings
+                return false;
+            }
+
+            // Add segment to new path (avoid duplicating connection points)
+            for (int j = 0; j < segment.size(); j++) {
+                if (i == 0 || j > 0) {
+                    newPath.add(segment.get(j));
+                }
+            }
+        }
+
+        if (newPath.isEmpty()) return false;
+
+        // Successfully recalculated! Update both routePathTiles and pathTiles
+        this.routePathTiles = newPath;
+        this.pathTiles = newPath;
+
+        // Find where we are on the new path
+        int currentIdx = indexOfTile(newPath, currentTileX, currentTileY);
+        if (currentIdx >= 0) {
+            this.pathIndex = currentIdx;
+        } else {
+            // We're not on the new path, try to find a way to rejoin it
+            this.pathIndex = 0;
+        }
+
+        return true;
+    }
+
+    private int[] getBuildingCoords(Object building) {
+        if (building instanceof City c) {
+            return new int[]{c.getOriginX(), c.getOriginY()};
+        } else if (building instanceof Industry i) {
+            return new int[]{i.getOriginX(), i.getOriginY()};
+        }
+        return null;
+    }
+
+    private int[] getBuildingSize(Object building) {
+        if (building instanceof City c) {
+            return new int[]{c.getWidth(), c.getHeight()};
+        } else if (building instanceof Industry i) {
+            return new int[]{i.getWidth(), i.getHeight()};
         }
         return null;
     }
