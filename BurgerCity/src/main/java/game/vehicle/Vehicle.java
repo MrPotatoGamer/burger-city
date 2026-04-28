@@ -1000,6 +1000,20 @@ public class Vehicle {
     private void handleIndustryInteraction(Industry industry, Player player, City otherEndpointCity, Industry otherEndpointIndustry) {
         if (industry == null) return;
 
+        // Step 1: Deliver cargo if we have any
+        if (currentCargo != null && !currentCargo.isEmpty()) {
+            ResourceType type = currentCargo.getType();
+            int amount = currentCargo.getAmount();
+
+            if (amount > 0 && industry.consumes(type)) {
+                industry.deliverToStorage(type, amount);
+                int revenue = amount * ResourcePrices.revenuePerUnit(type);
+                if (revenue != 0) player.addMoney(revenue);
+                currentCargo = null;
+            }
+        }
+
+        // Step 2: Load new cargo if we're now empty
         if (currentCargo == null || currentCargo.isEmpty()) {
             // Load only produced goods that can be delivered to the other endpoint.
             for (ResourceType type : industry.getProfile().getOutputsPerUnit().keySet()) {
@@ -1014,20 +1028,7 @@ public class Vehicle {
                     return;
                 }
             }
-            return;
         }
-
-        // Deliver inputs to industries that consume them.
-        ResourceType type = currentCargo.getType();
-        int amount = currentCargo.getAmount();
-        if (amount <= 0) return;
-
-        if (!industry.consumes(type)) return;
-        industry.deliverToStorage(type, amount);
-
-        int revenue = amount * ResourcePrices.revenuePerUnit(type);
-        if (revenue != 0) player.addMoney(revenue);
-        currentCargo = null;
     }
 
     private static boolean canDeliverToOtherEndpoint(ResourceType type, City otherCity, Industry otherIndustry) {
