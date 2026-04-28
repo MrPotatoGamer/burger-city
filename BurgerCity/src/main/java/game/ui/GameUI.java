@@ -223,34 +223,42 @@ public class GameUI extends JFrame {
 
         buildRoadButton = new JButton("Út építés (" + Road.COST + "$)");
         buildRoadButton.addActionListener(e -> toggleRoadBuildMode());
+        styleButton(buildRoadButton, new Color(34, 139, 34));
         topPanel.add(buildRoadButton);
 
         buyVehicleButton = new JButton("Jármű vásárlás");
         buyVehicleButton.addActionListener(e -> toggleBuyVehicleMode());
+        styleButton(buyVehicleButton, new Color(65, 105, 225));
         topPanel.add(buyVehicleButton);
 
         buyBuildingButton = new JButton("Épület vásárlás");
         buyBuildingButton.addActionListener(e -> toggleBuyBuildingMode());
+        styleButton(buyBuildingButton, new Color(184, 134, 11));
         topPanel.add(buyBuildingButton);
 
         buyIndustryButton = new JButton("Industry vásárlás");
         buyIndustryButton.addActionListener(e -> toggleBuyIndustryMode());
+        styleButton(buyIndustryButton, new Color(148, 0, 211));
         topPanel.add(buyIndustryButton);
 
         demolishButton = new JButton("Rombolás");
         demolishButton.addActionListener(e -> toggleDemolishMode());
+        styleButton(demolishButton, new Color(220, 20, 60));
         topPanel.add(demolishButton);
 
         saveGameButton = new JButton("Mentés");
         saveGameButton.addActionListener(e -> saveGame());
+        styleButton(saveGameButton, new Color(70, 130, 180));
         topPanel.add(saveGameButton);
 
         loadGameButton = new JButton("Betöltés");
         loadGameButton.addActionListener(e -> loadGame());
+        styleButton(loadGameButton, new Color(100, 149, 237));
         topPanel.add(loadGameButton);
 
         toggleDashboardButton = new JButton("Dashboard \u25C0");
         toggleDashboardButton.addActionListener(e -> toggleDashboard());
+        styleButton(toggleDashboardButton, new Color(105, 105, 105));
         topPanel.add(toggleDashboardButton);
 
         topWrapper.add(topPanel, BorderLayout.SOUTH);
@@ -1287,6 +1295,39 @@ public class GameUI extends JFrame {
                 updateStatus(toRemove.size() + " vehicles removed (building destroyed)");
             }
         }
+    }
+
+    /**
+     * Apply modern styling to a button with specified base color.
+     */
+    private void styleButton(JButton button, Color baseColor) {
+        button.setBackground(baseColor);
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Arial", Font.BOLD, 12));
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(baseColor.darker(), 2),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+        button.setOpaque(true);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        // Add hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (button.getBackground() != Color.GREEN) {
+                    button.setBackground(baseColor.brighter());
+                }
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                if (button.getBackground() != Color.GREEN) {
+                    button.setBackground(baseColor);
+                }
+            }
+        });
     }
 
     public static void main(String[] args) {
