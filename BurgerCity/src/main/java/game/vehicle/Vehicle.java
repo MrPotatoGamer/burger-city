@@ -776,13 +776,11 @@ public class Vehicle {
             }
         }
 
-        int nextIndex = pathForward ? pathIndex + 1 : pathIndex - 1;
+        // Always move forward for circular routes
+        int nextIndex = pathIndex + 1;
         if (nextIndex >= pathTiles.size()) {
-            pathForward = false;
-            nextIndex = pathIndex - 1;
-        } else if (nextIndex < 0) {
-            pathForward = true;
-            nextIndex = pathIndex + 1;
+            // Wrap back to the beginning for circular routes
+            nextIndex = 0;
         }
 
         if (nextIndex < 0 || nextIndex >= pathTiles.size()) {
