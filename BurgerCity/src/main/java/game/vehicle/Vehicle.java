@@ -635,31 +635,32 @@ public class Vehicle {
 
     /**
      * Minimal economy hook: call after {@link #update(Map, double)}.
-     * Acts only when the vehicle arrived at a tile in the last update, and only at path endpoints.
+     * Acts when the vehicle arrived at a tile adjacent to a city or industry.
      */
     public void processArrivalEconomy(Map map, Player player) {
         if (!arrivedThisUpdate) return;
         arrivedThisUpdate = false;
         if (map == null || player == null) return;
 
-        if (!hasPath() || pathTiles.size() < 2) return;
-        int idx = indexOfTile(pathTiles, currentTileX, currentTileY);
-        if (idx != 0 && idx != pathTiles.size() - 1) return;
+        if (!hasPath() || pathTiles.isEmpty()) return;
 
+        // Check if we're adjacent to any city or industry
         City adjacentCity = findAdjacentCity(map, currentTileX, currentTileY);
         Industry adjacentIndustry = findAdjacentIndustry(map, currentTileX, currentTileY);
 
-        int otherIdx = (idx == 0) ? (pathTiles.size() - 1) : 0;
-        int[] otherTile = pathTiles.get(otherIdx);
-        City otherCity = findAdjacentCity(map, otherTile[0], otherTile[1]);
-        Industry otherIndustry = findAdjacentIndustry(map, otherTile[0], otherTile[1]);
+        // If not adjacent to anything, don't process
+        if (adjacentCity == null && adjacentIndustry == null) return;
+
+        // Find all cities and industries along the route for delivery logic
+        City nextCity = findNextCityOnRoute(map);
+        Industry nextIndustry = findNextIndustryOnRoute(map);
 
         // Better priority rules:
         // - If empty: prefer industry pickup (bus will skip due to canCarry checks).
         // - If carrying passengers: prefer city dropoff.
         // - If carrying goods: prefer industry if it consumes it, otherwise city if it demands it.
         if (currentCargo == null || currentCargo.isEmpty()) {
-            if (adjacentIndustry != null) handleIndustryInteraction(adjacentIndustry, player, otherCity, otherIndustry);
+            if (adjacentIndustry != null) handleIndustryInteraction(adjacentIndustry, player, nextCity, nextIndustry);
             if (adjacentCity != null) handleCityInteraction(adjacentCity, player);
             return;
         }
@@ -671,12 +672,12 @@ public class Vehicle {
         }
 
         if (adjacentIndustry != null && adjacentIndustry.consumes(cargoType)) {
-            handleIndustryInteraction(adjacentIndustry, player, otherCity, otherIndustry);
+            handleIndustryInteraction(adjacentIndustry, player, nextCity, nextIndustry);
         } else if (adjacentCity != null) {
             handleCityInteraction(adjacentCity, player);
         } else if (adjacentIndustry != null) {
             // Can't unload here, but still allow potential logic in the future.
-            handleIndustryInteraction(adjacentIndustry, player, otherCity, otherIndustry);
+            handleIndustryInteraction(adjacentIndustry, player, nextCity, nextIndustry);
         }
     }
 
@@ -1066,6 +1067,42 @@ public class Vehicle {
                     || i.occupies(roadX, roadY - 1)) {
                 return i;
             }
+        }
+        return null;
+    }
+
+    /**
+     * Find the next city along the vehicle's route (looking ahead from current position).
+     */
+    private City findNextCityOnRoute(Map map) {
+        if (!hasPath()) return null;
+        int currentIdx = indexOfTile(pathTiles, currentTileX, currentTileY);
+        if (currentIdx < 0) return null;
+
+        // Search forward along the path
+        for (int i = 1; i < pathTiles.size(); i++) {
+            int idx = (currentIdx + i) % pathTiles.size();
+            int[] tile = pathTiles.get(idx);
+            City city = findAdjacentCity(map, tile[0], tile[1]);
+            if (city != null) return city;
+        }
+        return null;
+    }
+
+    /**
+     * Find the next industry along the vehicle's route (looking ahead from current position).
+     */
+    private Industry findNextIndustryOnRoute(Map map) {
+        if (!hasPath()) return null;
+        int currentIdx = indexOfTile(pathTiles, currentTileX, currentTileY);
+        if (currentIdx < 0) return null;
+
+        // Search forward along the path
+        for (int i = 1; i < pathTiles.size(); i++) {
+            int idx = (currentIdx + i) % pathTiles.size();
+            int[] tile = pathTiles.get(idx);
+            Industry industry = findAdjacentIndustry(map, tile[0], tile[1]);
+            if (industry != null) return industry;
         }
         return null;
     }
