@@ -430,7 +430,8 @@ public class Map {
         if (building instanceof game.building.TrafficLight) {
             if (tile.getType() != TileType.ROAD) return false;
             // Don't allow overwriting an existing traffic light (or any other placed building on this road tile).
-            if (tile.isOccupied() || tile.getPlacedBuilding() != null) return false;
+            //if (tile.isOccupied() || tile.getPlacedBuilding() != null) return false;
+            if (tile.isOccupied() && tile.getType() != TileType.ROAD) return false;
 
             // Check if it's an intersection (3 or 4 road neighbors)
             int roadNeighbors = countRoadNeighbors(x, y);
@@ -504,15 +505,22 @@ public class Map {
     }
 
     /**
-     * Count how many neighbors of a tile are ROAD or BUILDING (for road connectivity).
+     * Count how many neighbors of a tile are ROAD tiles (for intersection detection).
      */
     private int countRoadNeighbors(int x, int y) {
         int count = 0;
-        if (isRoadOrBuilding(x, y - 1)) count++; // North
-        if (isRoadOrBuilding(x + 1, y)) count++; // East
-        if (isRoadOrBuilding(x, y + 1)) count++; // South
-        if (isRoadOrBuilding(x - 1, y)) count++; // West
+        if (isRoadTile(x, y - 1)) count++; // North
+        if (isRoadTile(x + 1, y)) count++; // East
+        if (isRoadTile(x, y + 1)) count++; // South
+        if (isRoadTile(x - 1, y)) count++; // West
         return count;
+    }
+
+    private boolean isRoadTile(int x, int y) {
+        if (!inBounds(x, y)) return false;
+        Tile t = getTile(x, y);
+        if (t == null) return false;
+        return t.getType() == TileType.ROAD;
     }
 
     private boolean isRoadOrBuilding(int x, int y) {

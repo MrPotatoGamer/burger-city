@@ -635,31 +635,32 @@ public class Vehicle {
 
     /**
      * Minimal economy hook: call after {@link #update(Map, double)}.
-     * Acts only when the vehicle arrived at a tile in the last update, and only at path endpoints.
+     * Acts when the vehicle arrived at a tile adjacent to a city or industry.
      */
     public void processArrivalEconomy(Map map, Player player) {
         if (!arrivedThisUpdate) return;
         arrivedThisUpdate = false;
         if (map == null || player == null) return;
 
-        if (!hasPath() || pathTiles.size() < 2) return;
-        int idx = indexOfTile(pathTiles, currentTileX, currentTileY);
-        if (idx != 0 && idx != pathTiles.size() - 1) return;
+        if (!hasPath() || pathTiles.isEmpty()) return;
 
+        // Check if we're adjacent to any city or industry
         City adjacentCity = findAdjacentCity(map, currentTileX, currentTileY);
         Industry adjacentIndustry = findAdjacentIndustry(map, currentTileX, currentTileY);
 
-        int otherIdx = (idx == 0) ? (pathTiles.size() - 1) : 0;
-        int[] otherTile = pathTiles.get(otherIdx);
-        City otherCity = findAdjacentCity(map, otherTile[0], otherTile[1]);
-        Industry otherIndustry = findAdjacentIndustry(map, otherTile[0], otherTile[1]);
+        // If not adjacent to anything, don't process
+        if (adjacentCity == null && adjacentIndustry == null) return;
+
+        // Find all cities and industries along the route for delivery logic
+        City nextCity = findNextCityOnRoute(map);
+        Industry nextIndustry = findNextIndustryOnRoute(map);
 
         // Better priority rules:
         // - If empty: prefer industry pickup (bus will skip due to canCarry checks).
         // - If carrying passengers: prefer city dropoff.
         // - If carrying goods: prefer industry if it consumes it, otherwise city if it demands it.
         if (currentCargo == null || currentCargo.isEmpty()) {
-            if (adjacentIndustry != null) handleIndustryInteraction(adjacentIndustry, player, otherCity, otherIndustry);
+            if (adjacentIndustry != null) handleIndustryInteraction(adjacentIndustry, player, nextCity, nextIndustry);
             if (adjacentCity != null) handleCityInteraction(adjacentCity, player);
             return;
         }
@@ -671,12 +672,12 @@ public class Vehicle {
         }
 
         if (adjacentIndustry != null && adjacentIndustry.consumes(cargoType)) {
-            handleIndustryInteraction(adjacentIndustry, player, otherCity, otherIndustry);
+            handleIndustryInteraction(adjacentIndustry, player, nextCity, nextIndustry);
         } else if (adjacentCity != null) {
             handleCityInteraction(adjacentCity, player);
         } else if (adjacentIndustry != null) {
             // Can't unload here, but still allow potential logic in the future.
-            handleIndustryInteraction(adjacentIndustry, player, otherCity, otherIndustry);
+            handleIndustryInteraction(adjacentIndustry, player, nextCity, nextIndustry);
         }
     }
 
@@ -775,13 +776,11 @@ public class Vehicle {
             }
         }
 
-        int nextIndex = pathForward ? pathIndex + 1 : pathIndex - 1;
+        // Always move forward for circular routes
+        int nextIndex = pathIndex + 1;
         if (nextIndex >= pathTiles.size()) {
-            pathForward = false;
-            nextIndex = pathIndex - 1;
-        } else if (nextIndex < 0) {
-            pathForward = true;
-            nextIndex = pathIndex + 1;
+            // Wrap back to the beginning for circular routes
+            nextIndex = 0;
         }
 
         if (nextIndex < 0 || nextIndex >= pathTiles.size()) {
@@ -793,6 +792,14 @@ public class Vehicle {
         int[] next = pathTiles.get(nextIndex);
         // Safety: only move onto ROAD.
         if (!isRoad(map, next[0], next[1])) {
+            // Road is missing! Try to recalculate the route
+            if (tryRecalculateRoute(map)) {
+                // Successfully recalculated, try again on next update
+                targetTileX = null;
+                targetTileY = null;
+                return;
+            }
+            // No valid route found, stop
             targetTileX = null;
             targetTileY = null;
             return;
@@ -1001,6 +1008,20 @@ public class Vehicle {
     private void handleIndustryInteraction(Industry industry, Player player, City otherEndpointCity, Industry otherEndpointIndustry) {
         if (industry == null) return;
 
+        // Step 1: Deliver cargo if we have any
+        if (currentCargo != null && !currentCargo.isEmpty()) {
+            ResourceType type = currentCargo.getType();
+            int amount = currentCargo.getAmount();
+
+            if (amount > 0 && industry.consumes(type)) {
+                industry.deliverToStorage(type, amount);
+                int revenue = amount * ResourcePrices.revenuePerUnit(type);
+                if (revenue != 0) player.addMoney(revenue);
+                currentCargo = null;
+            }
+        }
+
+        // Step 2: Load new cargo if we're now empty
         if (currentCargo == null || currentCargo.isEmpty()) {
             // Load only produced goods that can be delivered to the other endpoint.
             for (ResourceType type : industry.getProfile().getOutputsPerUnit().keySet()) {
@@ -1015,20 +1036,7 @@ public class Vehicle {
                     return;
                 }
             }
-            return;
         }
-
-        // Deliver inputs to industries that consume them.
-        ResourceType type = currentCargo.getType();
-        int amount = currentCargo.getAmount();
-        if (amount <= 0) return;
-
-        if (!industry.consumes(type)) return;
-        industry.deliverToStorage(type, amount);
-
-        int revenue = amount * ResourcePrices.revenuePerUnit(type);
-        if (revenue != 0) player.addMoney(revenue);
-        currentCargo = null;
     }
 
     private static boolean canDeliverToOtherEndpoint(ResourceType type, City otherCity, Industry otherIndustry) {
@@ -1066,6 +1074,226 @@ public class Vehicle {
                     || i.occupies(roadX, roadY - 1)) {
                 return i;
             }
+        }
+        return null;
+    }
+
+    /**
+     * Find the next city along the vehicle's route (looking ahead from current position).
+     */
+    private City findNextCityOnRoute(Map map) {
+        if (!hasPath()) return null;
+        int currentIdx = indexOfTile(pathTiles, currentTileX, currentTileY);
+        if (currentIdx < 0) return null;
+
+        // Search forward along the path
+        for (int i = 1; i < pathTiles.size(); i++) {
+            int idx = (currentIdx + i) % pathTiles.size();
+            int[] tile = pathTiles.get(idx);
+            City city = findAdjacentCity(map, tile[0], tile[1]);
+            if (city != null) return city;
+        }
+        return null;
+    }
+
+    /**
+     * Find the next industry along the vehicle's route (looking ahead from current position).
+     */
+    private Industry findNextIndustryOnRoute(Map map) {
+        if (!hasPath()) return null;
+        int currentIdx = indexOfTile(pathTiles, currentTileX, currentTileY);
+        if (currentIdx < 0) return null;
+
+        // Search forward along the path
+        for (int i = 1; i < pathTiles.size(); i++) {
+            int idx = (currentIdx + i) % pathTiles.size();
+            int[] tile = pathTiles.get(idx);
+            Industry industry = findAdjacentIndustry(map, tile[0], tile[1]);
+            if (industry != null) return industry;
+        }
+        return null;
+    }
+
+    /**
+     * Try to recalculate the route when the current path is blocked.
+     * Finds all cities/industries along the original route and rebuilds the circular path.
+     * @return true if recalculation succeeded, false otherwise
+     */
+    private boolean tryRecalculateRoute(Map map) {
+        if (map == null) return false;
+        if (routePathTiles == null || routePathTiles.isEmpty()) return false;
+
+        // Find all unique buildings (cities/industries) along the original route
+        java.util.Set<String> seenBuildings = new java.util.HashSet<>();
+        java.util.List<Object> buildings = new java.util.ArrayList<>();
+
+        for (int[] tile : routePathTiles) {
+            City city = findAdjacentCity(map, tile[0], tile[1]);
+            if (city != null) {
+                String key = "city_" + city.getOriginX() + "_" + city.getOriginY();
+                if (!seenBuildings.contains(key)) {
+                    seenBuildings.add(key);
+                    buildings.add(city);
+                }
+            }
+
+            Industry industry = findAdjacentIndustry(map, tile[0], tile[1]);
+            if (industry != null) {
+                String key = "industry_" + industry.getOriginX() + "_" + industry.getOriginY();
+                if (!seenBuildings.contains(key)) {
+                    seenBuildings.add(key);
+                    buildings.add(industry);
+                }
+            }
+        }
+
+        // Need at least 2 buildings to make a route
+        if (buildings.size() < 2) return false;
+
+        // Find the next building in the route from current position
+        Object nextBuilding = findNextBuildingFromCurrent(buildings);
+        if (nextBuilding == null) nextBuilding = buildings.get(0);
+
+        // Reorder buildings to start from nextBuilding
+        java.util.List<Object> reorderedBuildings = new java.util.ArrayList<>();
+        int startIdx = buildings.indexOf(nextBuilding);
+        for (int i = 0; i < buildings.size(); i++) {
+            reorderedBuildings.add(buildings.get((startIdx + i) % buildings.size()));
+        }
+
+        // Step 1: Find path from current position to the first building
+        Object firstBuilding = reorderedBuildings.get(0);
+        int[] firstCoords = getBuildingCoords(firstBuilding);
+        int[] firstSize = getBuildingSize(firstBuilding);
+
+        java.util.List<int[]> pathToFirst = map.findRoadPathBetweenRoadTiles(
+            currentTileX, currentTileY,
+            firstCoords[0], firstCoords[1]
+        );
+
+        // If we can't find a direct path to first building, try adjacent road tiles
+        if (pathToFirst == null || pathToFirst.isEmpty()) {
+            java.util.List<int[]> adjacentRoads = map.adjacentRoadTilesForArea(
+                firstCoords[0], firstCoords[1], firstSize[0], firstSize[1]
+            );
+            for (int[] roadTile : adjacentRoads) {
+                pathToFirst = map.findRoadPathBetweenRoadTiles(
+                    currentTileX, currentTileY,
+                    roadTile[0], roadTile[1]
+                );
+                if (pathToFirst != null && !pathToFirst.isEmpty()) break;
+            }
+        }
+
+        if (pathToFirst == null || pathToFirst.isEmpty()) return false;
+
+        // Step 2: Build the full circular route starting from first building
+        java.util.List<int[]> fullCircularRoute = new java.util.ArrayList<>();
+
+        for (int i = 0; i < reorderedBuildings.size(); i++) {
+            Object current = reorderedBuildings.get(i);
+            Object next = reorderedBuildings.get((i + 1) % reorderedBuildings.size());
+
+            int[] currentCoords = getBuildingCoords(current);
+            int[] currentSize = getBuildingSize(current);
+            int[] nextCoords = getBuildingCoords(next);
+            int[] nextSize = getBuildingSize(next);
+
+            if (currentCoords == null || nextCoords == null) return false;
+
+            java.util.List<int[]> segment = map.findRoadPathBetweenAreas(
+                currentCoords[0], currentCoords[1], currentSize[0], currentSize[1],
+                nextCoords[0], nextCoords[1], nextSize[0], nextSize[1]
+            );
+
+            if (segment == null || segment.isEmpty()) {
+                return false;
+            }
+
+            for (int j = 0; j < segment.size(); j++) {
+                if (i == 0 || j > 0) {
+                    fullCircularRoute.add(segment.get(j));
+                }
+            }
+        }
+
+        if (fullCircularRoute.isEmpty()) return false;
+
+        // Step 3: Set the new path - start with pathToFirst, then continue with circular route
+        java.util.List<int[]> newPath = new java.util.ArrayList<>(pathToFirst);
+
+        // Find where pathToFirst connects to fullCircularRoute and continue from there
+        int[] lastOfPathToFirst = pathToFirst.get(pathToFirst.size() - 1);
+        int connectionIdx = indexOfTile(fullCircularRoute, lastOfPathToFirst[0], lastOfPathToFirst[1]);
+
+        if (connectionIdx >= 0) {
+            // Add the rest of the circular route starting from connection point
+            for (int i = connectionIdx + 1; i < fullCircularRoute.size(); i++) {
+                newPath.add(fullCircularRoute.get(i));
+            }
+            // Add the beginning part to complete the circle
+            for (int i = 0; i <= connectionIdx; i++) {
+                newPath.add(fullCircularRoute.get(i));
+            }
+        } else {
+            // Connection not found, just append the full circular route
+            newPath.addAll(fullCircularRoute);
+        }
+
+        // Update paths
+        this.routePathTiles = fullCircularRoute; // Keep the full circular route for future recalculations
+        this.pathTiles = newPath; // Current path includes the rejoin segment
+
+        // Vehicle is at the start of the new path
+        this.pathIndex = 0;
+        this.rejoiningRoute = true;
+        this.rejoinRouteAtX = lastOfPathToFirst[0];
+        this.rejoinRouteAtY = lastOfPathToFirst[1];
+
+        return true;
+    }
+
+    /**
+     * Find the next building ahead on the route from current position.
+     */
+    private Object findNextBuildingFromCurrent(java.util.List<Object> buildings) {
+        // Try to find which building we were heading towards
+        for (int i = pathIndex; i < Math.min(pathIndex + 20, pathTiles.size()); i++) {
+            int[] tile = pathTiles.get(i);
+            for (Object building : buildings) {
+                if (isTileAdjacentToBuilding(tile[0], tile[1], building)) {
+                    return building;
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean isTileAdjacentToBuilding(int tileX, int tileY, Object building) {
+        if (building instanceof City c) {
+            return c.occupies(tileX + 1, tileY) || c.occupies(tileX - 1, tileY) ||
+                   c.occupies(tileX, tileY + 1) || c.occupies(tileX, tileY - 1);
+        } else if (building instanceof Industry i) {
+            return i.occupies(tileX + 1, tileY) || i.occupies(tileX - 1, tileY) ||
+                   i.occupies(tileX, tileY + 1) || i.occupies(tileX, tileY - 1);
+        }
+        return false;
+    }
+
+    private int[] getBuildingCoords(Object building) {
+        if (building instanceof City c) {
+            return new int[]{c.getOriginX(), c.getOriginY()};
+        } else if (building instanceof Industry i) {
+            return new int[]{i.getOriginX(), i.getOriginY()};
+        }
+        return null;
+    }
+
+    private int[] getBuildingSize(Object building) {
+        if (building instanceof City c) {
+            return new int[]{c.getWidth(), c.getHeight()};
+        } else if (building instanceof Industry i) {
+            return new int[]{i.getWidth(), i.getHeight()};
         }
         return null;
     }
