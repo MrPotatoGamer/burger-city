@@ -223,34 +223,42 @@ public class GameUI extends JFrame {
 
         buildRoadButton = new JButton("Út építés (" + Road.COST + "$)");
         buildRoadButton.addActionListener(e -> toggleRoadBuildMode());
+        styleButton(buildRoadButton, new Color(34, 139, 34));
         topPanel.add(buildRoadButton);
 
         buyVehicleButton = new JButton("Jármű vásárlás");
         buyVehicleButton.addActionListener(e -> toggleBuyVehicleMode());
+        styleButton(buyVehicleButton, new Color(65, 105, 225));
         topPanel.add(buyVehicleButton);
 
         buyBuildingButton = new JButton("Épület vásárlás");
         buyBuildingButton.addActionListener(e -> toggleBuyBuildingMode());
+        styleButton(buyBuildingButton, new Color(184, 134, 11));
         topPanel.add(buyBuildingButton);
 
         buyIndustryButton = new JButton("Industry vásárlás");
         buyIndustryButton.addActionListener(e -> toggleBuyIndustryMode());
+        styleButton(buyIndustryButton, new Color(148, 0, 211));
         topPanel.add(buyIndustryButton);
 
         demolishButton = new JButton("Rombolás");
         demolishButton.addActionListener(e -> toggleDemolishMode());
+        styleButton(demolishButton, new Color(220, 20, 60));
         topPanel.add(demolishButton);
 
         saveGameButton = new JButton("Mentés");
         saveGameButton.addActionListener(e -> saveGame());
+        styleButton(saveGameButton, new Color(70, 130, 180));
         topPanel.add(saveGameButton);
 
         loadGameButton = new JButton("Betöltés");
         loadGameButton.addActionListener(e -> loadGame());
+        styleButton(loadGameButton, new Color(100, 149, 237));
         topPanel.add(loadGameButton);
 
         toggleDashboardButton = new JButton("Dashboard \u25C0");
         toggleDashboardButton.addActionListener(e -> toggleDashboard());
+        styleButton(toggleDashboardButton, new Color(105, 105, 105));
         topPanel.add(toggleDashboardButton);
 
         topWrapper.add(topPanel, BorderLayout.SOUTH);
@@ -486,23 +494,61 @@ public class GameUI extends JFrame {
     }
 
     private BuildableBuilding chooseBuildableBuilding() {
-        Object[] options = {"Garage", "Stop", "TrafficLight"};
-        int choice = JOptionPane.showOptionDialog(
-                this,
-                "Válassz épület típust (mindegyik ára: " + BUILDING_COST + "$):",
-                "Épület vásárlás",
-                JOptionPane.DEFAULT_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                options,
-                options[0]
-        );
-        return switch (choice) {
-            case 0 -> BuildableBuilding.GARAGE;
-            case 1 -> BuildableBuilding.STOP;
-            case 2 -> BuildableBuilding.TRAFFIC_LIGHT;
-            default -> null;
-        };
+        JDialog dialog = new JDialog(this, "Épület vásárlás", true);
+        dialog.setLayout(new BorderLayout(10, 10));
+
+        // Title panel
+        JPanel titlePanel = new JPanel();
+        titlePanel.setBackground(new Color(184, 134, 11));
+        JLabel titleLabel = new JLabel("Válassz épület típust (ára: " + BUILDING_COST + "$)");
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        titleLabel.setForeground(Color.WHITE);
+        titlePanel.add(titleLabel);
+
+        // Options panel
+        JPanel optionsPanel = new JPanel(new GridLayout(3, 1, 10, 10));
+        optionsPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        BuildableBuilding[] result = {null};
+
+        JButton garageBtn = createDialogButton("🏠 Garage", "Járművek tárolása és karbantartása", new Color(70, 130, 180));
+        garageBtn.addActionListener(e -> {
+            result[0] = BuildableBuilding.GARAGE;
+            dialog.dispose();
+        });
+
+        JButton stopBtn = createDialogButton("🚏 Stop", "Utasok fel- és leszállása", new Color(34, 139, 34));
+        stopBtn.addActionListener(e -> {
+            result[0] = BuildableBuilding.STOP;
+            dialog.dispose();
+        });
+
+        JButton trafficLightBtn = createDialogButton("🚦 Traffic Light", "Forgalom irányítása kereszteződésben", new Color(220, 20, 60));
+        trafficLightBtn.addActionListener(e -> {
+            result[0] = BuildableBuilding.TRAFFIC_LIGHT;
+            dialog.dispose();
+        });
+
+        optionsPanel.add(garageBtn);
+        optionsPanel.add(stopBtn);
+        optionsPanel.add(trafficLightBtn);
+
+        // Cancel button
+        JPanel bottomPanel = new JPanel();
+        JButton cancelBtn = new JButton("Mégse");
+        styleButton(cancelBtn, new Color(128, 128, 128));
+        cancelBtn.addActionListener(e -> dialog.dispose());
+        bottomPanel.add(cancelBtn);
+
+        dialog.add(titlePanel, BorderLayout.NORTH);
+        dialog.add(optionsPanel, BorderLayout.CENTER);
+        dialog.add(bottomPanel, BorderLayout.SOUTH);
+
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+
+        return result[0];
     }
 
     private void toggleBuyIndustryMode() {
@@ -554,26 +600,75 @@ public class GameUI extends JFrame {
     }
 
     private IndustryType chooseIndustryType() {
-        Object[] options = {"Farm", "Ranch", "Bakery", "Patty Plant", "Burger Factory", "Factory"};
-        int choice = JOptionPane.showOptionDialog(
-                this,
-                "Válassz industry típust (ára: " + INDUSTRY_COST + "$ | foglal: 2x2):",
-                "Industry vásárlás",
-                JOptionPane.DEFAULT_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                options,
-                options[0]
-        );
-        return switch (choice) {
-            case 0 -> IndustryType.FARM;
-            case 1 -> IndustryType.RANCH;
-            case 2 -> IndustryType.BAKERY;
-            case 3 -> IndustryType.PATTY_PLANT;
-            case 4 -> IndustryType.BURGER_FACTORY;
-            case 5 -> IndustryType.FACTORY;
-            default -> null;
-        };
+        JDialog dialog = new JDialog(this, "Industry vásárlás", true);
+        dialog.setLayout(new BorderLayout(10, 10));
+
+        // Title panel
+        JPanel titlePanel = new JPanel();
+        titlePanel.setBackground(new Color(148, 0, 211));
+        JLabel titleLabel = new JLabel("Válassz industry típust (ára: " + INDUSTRY_COST + "$ | foglal: 2x2)");
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        titleLabel.setForeground(Color.WHITE);
+        titlePanel.add(titleLabel);
+
+        // Options panel
+        JPanel optionsPanel = new JPanel(new GridLayout(3, 2, 10, 10));
+        optionsPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        IndustryType[] result = {null};
+
+        JButton farmBtn = createDialogButton("🌾 Farm", "Gabona termelés", new Color(107, 142, 35));
+        farmBtn.addActionListener(e -> {
+            result[0] = IndustryType.FARM;
+            dialog.dispose();
+        });
+
+        JButton ranchBtn = createDialogButton("🐄 Ranch", "Állattenyésztés", new Color(160, 82, 45));
+        ranchBtn.addActionListener(e -> {
+            result[0] = IndustryType.RANCH;
+            dialog.dispose();
+        });
+
+        JButton bakeryBtn = createDialogButton("🍞 Bakery", "Buci készítés", new Color(210, 180, 140));
+        bakeryBtn.addActionListener(e -> {
+            result[0] = IndustryType.BAKERY;
+            dialog.dispose();
+        });
+
+        JButton pattyBtn = createDialogButton("🥩 Patty Plant", "Húspogácsa előállítás", new Color(178, 34, 34));
+        pattyBtn.addActionListener(e -> {
+            result[0] = IndustryType.PATTY_PLANT;
+            dialog.dispose();
+        });
+
+        JButton burgerBtn = createDialogButton("🍔 Burger Factory", "Hamburger készítés", new Color(255, 140, 0));
+        burgerBtn.addActionListener(e -> {
+            result[0] = IndustryType.BURGER_FACTORY;
+            dialog.dispose();
+        });
+
+        optionsPanel.add(farmBtn);
+        optionsPanel.add(ranchBtn);
+        optionsPanel.add(bakeryBtn);
+        optionsPanel.add(pattyBtn);
+        optionsPanel.add(burgerBtn);
+
+        // Cancel button
+        JPanel bottomPanel = new JPanel();
+        JButton cancelBtn = new JButton("Mégse");
+        styleButton(cancelBtn, new Color(128, 128, 128));
+        cancelBtn.addActionListener(e -> dialog.dispose());
+        bottomPanel.add(cancelBtn);
+
+        dialog.add(titlePanel, BorderLayout.NORTH);
+        dialog.add(optionsPanel, BorderLayout.CENTER);
+        dialog.add(bottomPanel, BorderLayout.SOUTH);
+
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+
+        return result[0];
     }
 
     private void toggleDemolishMode() {
@@ -931,19 +1026,9 @@ public class GameUI extends JFrame {
             return;
         }
 
-        Object[] options = {"Bus", "Truck", "Advanced Bus", "Advanced Truck"};
-        int choice = JOptionPane.showOptionDialog(
-                this,
-                "Válassz jármű típust:",
-                "Jármű vásárlás",
-                JOptionPane.DEFAULT_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                options,
-                options[0]
-        );
+        Integer choice = chooseVehicleType();
 
-        if (choice < 0 || choice > 3) {
+        if (choice == null) {
             player.addMoney(VEHICLE_COST);
             updateStatus("Jármű vásárlás megszakítva.");
             return;
@@ -957,6 +1042,7 @@ public class GameUI extends JFrame {
             return;
         }
 
+        String[] vehicleNames = {"Bus", "Truck", "Advanced Bus", "Advanced Truck"};
         Vehicle v = switch (choice) {
             case 0 -> new Bus();
             case 1 -> new Truck();
@@ -973,7 +1059,7 @@ public class GameUI extends JFrame {
                             endBuilding.originX(), endBuilding.originY());
         vehicles.add(v);
         mapRenderer.repaint();
-        updateStatus("Jármű megvásárolva garázsból: " + options[choice] + " | Útvonal: " + startBuilding.name() + " -> " + endBuilding.name());
+        updateStatus("Jármű megvásárolva garázsból: " + vehicleNames[choice] + " | Útvonal: " + startBuilding.name() + " -> " + endBuilding.name());
         clearVehicleSelection();
     }
 
@@ -1287,6 +1373,154 @@ public class GameUI extends JFrame {
                 updateStatus(toRemove.size() + " vehicles removed (building destroyed)");
             }
         }
+    }
+
+    /**
+     * Create a styled vehicle type selection dialog
+     */
+    private Integer chooseVehicleType() {
+        JDialog dialog = new JDialog(this, "Jármű vásárlás", true);
+        dialog.setLayout(new BorderLayout(10, 10));
+
+        // Title panel
+        JPanel titlePanel = new JPanel();
+        titlePanel.setBackground(new Color(65, 105, 225));
+        JLabel titleLabel = new JLabel("Válassz jármű típust (ára: " + VEHICLE_COST + "$)");
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        titleLabel.setForeground(Color.WHITE);
+        titlePanel.add(titleLabel);
+
+        // Options panel
+        JPanel optionsPanel = new JPanel(new GridLayout(2, 2, 10, 10));
+        optionsPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        Integer[] result = {null};
+
+        JButton busBtn = createDialogButton("🚌 Bus", "Utasok szállítása városok között", new Color(30, 144, 255));
+        busBtn.addActionListener(e -> {
+            result[0] = 0;
+            dialog.dispose();
+        });
+
+        JButton truckBtn = createDialogButton("🚚 Truck", "Áruk szállítása", new Color(70, 130, 180));
+        truckBtn.addActionListener(e -> {
+            result[0] = 1;
+            dialog.dispose();
+        });
+
+        JButton advBusBtn = createDialogButton("🚍 Advanced Bus", "Nagyobb kapacitású utasszállítás", new Color(0, 191, 255));
+        advBusBtn.addActionListener(e -> {
+            result[0] = 2;
+            dialog.dispose();
+        });
+
+        JButton advTruckBtn = createDialogButton("🚛 Advanced Truck", "Nagyobb kapacitású áruszállítás", new Color(100, 149, 237));
+        advTruckBtn.addActionListener(e -> {
+            result[0] = 3;
+            dialog.dispose();
+        });
+
+        optionsPanel.add(busBtn);
+        optionsPanel.add(truckBtn);
+        optionsPanel.add(advBusBtn);
+        optionsPanel.add(advTruckBtn);
+
+        // Cancel button
+        JPanel bottomPanel = new JPanel();
+        JButton cancelBtn = new JButton("Mégse");
+        styleButton(cancelBtn, new Color(128, 128, 128));
+        cancelBtn.addActionListener(e -> dialog.dispose());
+        bottomPanel.add(cancelBtn);
+
+        dialog.add(titlePanel, BorderLayout.NORTH);
+        dialog.add(optionsPanel, BorderLayout.CENTER);
+        dialog.add(bottomPanel, BorderLayout.SOUTH);
+
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+
+        return result[0];
+    }
+
+    /**
+     * Create a styled dialog button with title and description
+     */
+    private JButton createDialogButton(String title, String description, Color color) {
+        JButton button = new JButton();
+        button.setLayout(new BorderLayout(5, 5));
+        button.setBackground(color);
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(color.darker(), 2),
+            BorderFactory.createEmptyBorder(15, 15, 15, 15)
+        ));
+        button.setOpaque(true);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        titleLabel.setForeground(Color.WHITE);
+
+        JLabel descLabel = new JLabel("<html><i>" + description + "</i></html>");
+        descLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+        descLabel.setForeground(new Color(240, 240, 240));
+
+        JPanel textPanel = new JPanel(new BorderLayout(0, 5));
+        textPanel.setOpaque(false);
+        textPanel.add(titleLabel, BorderLayout.NORTH);
+        textPanel.add(descLabel, BorderLayout.CENTER);
+
+        button.add(textPanel, BorderLayout.CENTER);
+
+        // Hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(color.brighter());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(color);
+            }
+        });
+
+        return button;
+    }
+
+    /**
+     * Apply modern styling to a button with specified base color.
+     */
+    private void styleButton(JButton button, Color baseColor) {
+        button.setBackground(baseColor);
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Arial", Font.BOLD, 12));
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(baseColor.darker(), 2),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+        button.setOpaque(true);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        // Add hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (button.getBackground() != Color.GREEN) {
+                    button.setBackground(baseColor.brighter());
+                }
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                if (button.getBackground() != Color.GREEN) {
+                    button.setBackground(baseColor);
+                }
+            }
+        });
     }
 
     public static void main(String[] args) {
