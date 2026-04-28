@@ -1150,12 +1150,49 @@ public class Vehicle {
         // Need at least 2 buildings to make a route
         if (buildings.size() < 2) return false;
 
-        // Try to rebuild the circular path between all buildings
-        java.util.List<int[]> newPath = new java.util.ArrayList<>();
+        // Find the next building in the route from current position
+        Object nextBuilding = findNextBuildingFromCurrent(buildings);
+        if (nextBuilding == null) nextBuilding = buildings.get(0);
 
+        // Reorder buildings to start from nextBuilding
+        java.util.List<Object> reorderedBuildings = new java.util.ArrayList<>();
+        int startIdx = buildings.indexOf(nextBuilding);
         for (int i = 0; i < buildings.size(); i++) {
-            Object current = buildings.get(i);
-            Object next = buildings.get((i + 1) % buildings.size());
+            reorderedBuildings.add(buildings.get((startIdx + i) % buildings.size()));
+        }
+
+        // Step 1: Find path from current position to the first building
+        Object firstBuilding = reorderedBuildings.get(0);
+        int[] firstCoords = getBuildingCoords(firstBuilding);
+        int[] firstSize = getBuildingSize(firstBuilding);
+
+        java.util.List<int[]> pathToFirst = map.findRoadPathBetweenRoadTiles(
+            currentTileX, currentTileY,
+            firstCoords[0], firstCoords[1]
+        );
+
+        // If we can't find a direct path to first building, try adjacent road tiles
+        if (pathToFirst == null || pathToFirst.isEmpty()) {
+            java.util.List<int[]> adjacentRoads = map.adjacentRoadTilesForArea(
+                firstCoords[0], firstCoords[1], firstSize[0], firstSize[1]
+            );
+            for (int[] roadTile : adjacentRoads) {
+                pathToFirst = map.findRoadPathBetweenRoadTiles(
+                    currentTileX, currentTileY,
+                    roadTile[0], roadTile[1]
+                );
+                if (pathToFirst != null && !pathToFirst.isEmpty()) break;
+            }
+        }
+
+        if (pathToFirst == null || pathToFirst.isEmpty()) return false;
+
+        // Step 2: Build the full circular route starting from first building
+        java.util.List<int[]> fullCircularRoute = new java.util.ArrayList<>();
+
+        for (int i = 0; i < reorderedBuildings.size(); i++) {
+            Object current = reorderedBuildings.get(i);
+            Object next = reorderedBuildings.get((i + 1) % reorderedBuildings.size());
 
             int[] currentCoords = getBuildingCoords(current);
             int[] currentSize = getBuildingSize(current);
@@ -1170,34 +1207,77 @@ public class Vehicle {
             );
 
             if (segment == null || segment.isEmpty()) {
-                // Cannot find path between these buildings
                 return false;
             }
 
-            // Add segment to new path (avoid duplicating connection points)
             for (int j = 0; j < segment.size(); j++) {
                 if (i == 0 || j > 0) {
-                    newPath.add(segment.get(j));
+                    fullCircularRoute.add(segment.get(j));
                 }
             }
         }
 
-        if (newPath.isEmpty()) return false;
+        if (fullCircularRoute.isEmpty()) return false;
 
-        // Successfully recalculated! Update both routePathTiles and pathTiles
-        this.routePathTiles = newPath;
-        this.pathTiles = newPath;
+        // Step 3: Set the new path - start with pathToFirst, then continue with circular route
+        java.util.List<int[]> newPath = new java.util.ArrayList<>(pathToFirst);
 
-        // Find where we are on the new path
-        int currentIdx = indexOfTile(newPath, currentTileX, currentTileY);
-        if (currentIdx >= 0) {
-            this.pathIndex = currentIdx;
+        // Find where pathToFirst connects to fullCircularRoute and continue from there
+        int[] lastOfPathToFirst = pathToFirst.get(pathToFirst.size() - 1);
+        int connectionIdx = indexOfTile(fullCircularRoute, lastOfPathToFirst[0], lastOfPathToFirst[1]);
+
+        if (connectionIdx >= 0) {
+            // Add the rest of the circular route starting from connection point
+            for (int i = connectionIdx + 1; i < fullCircularRoute.size(); i++) {
+                newPath.add(fullCircularRoute.get(i));
+            }
+            // Add the beginning part to complete the circle
+            for (int i = 0; i <= connectionIdx; i++) {
+                newPath.add(fullCircularRoute.get(i));
+            }
         } else {
-            // We're not on the new path, try to find a way to rejoin it
-            this.pathIndex = 0;
+            // Connection not found, just append the full circular route
+            newPath.addAll(fullCircularRoute);
         }
 
+        // Update paths
+        this.routePathTiles = fullCircularRoute; // Keep the full circular route for future recalculations
+        this.pathTiles = newPath; // Current path includes the rejoin segment
+
+        // Vehicle is at the start of the new path
+        this.pathIndex = 0;
+        this.rejoiningRoute = true;
+        this.rejoinRouteAtX = lastOfPathToFirst[0];
+        this.rejoinRouteAtY = lastOfPathToFirst[1];
+
         return true;
+    }
+
+    /**
+     * Find the next building ahead on the route from current position.
+     */
+    private Object findNextBuildingFromCurrent(java.util.List<Object> buildings) {
+        // Try to find which building we were heading towards
+        for (int i = pathIndex; i < Math.min(pathIndex + 20, pathTiles.size()); i++) {
+            int[] tile = pathTiles.get(i);
+            for (Object building : buildings) {
+                if (isTileAdjacentToBuilding(tile[0], tile[1], building)) {
+                    return building;
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean isTileAdjacentToBuilding(int tileX, int tileY, Object building) {
+        if (building instanceof City c) {
+            return c.occupies(tileX + 1, tileY) || c.occupies(tileX - 1, tileY) ||
+                   c.occupies(tileX, tileY + 1) || c.occupies(tileX, tileY - 1);
+        } else if (building instanceof Industry i) {
+            return i.occupies(tileX + 1, tileY) || i.occupies(tileX - 1, tileY) ||
+                   i.occupies(tileX, tileY + 1) || i.occupies(tileX, tileY - 1);
+        }
+        return false;
     }
 
     private int[] getBuildingCoords(Object building) {
