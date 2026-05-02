@@ -12,6 +12,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -404,8 +405,8 @@ public class MapRenderer extends JPanel {
             }
 
             if (vehicleImage != null) {
-                // Textúra rajzolása
-                g2.drawImage(vehicleImage, vx, vy, null);
+                // Textúra rajzolása a megfelelő irányba forgatva/flipelve
+                drawVehicleOriented(g2, vehicleImage, vx, vy, v.getRenderDirection());
             } else {
                 // Fallback: színes kör
                 g2.setColor(Color.BLACK);
@@ -414,6 +415,46 @@ public class MapRenderer extends JPanel {
                 g2.fillOval(vx, vy, vehicleSize, vehicleSize);
             }
         }
+    }
+
+    /**
+     * Draw a vehicle sprite oriented to its direction.
+     * Assumes the base sprite faces WEST (dir=4).
+     * dir: 0=none, 1=N, 2=E, 3=S, 4=W.
+     */
+    private void drawVehicleOriented(Graphics2D g2, BufferedImage img, int x, int y, int dir) {
+        if (img == null) return;
+        int w = img.getWidth();
+        int h = img.getHeight();
+
+        if (dir == 0 || dir == 4) {
+            g2.drawImage(img, x, y, null);
+            return;
+        }
+
+        AffineTransform old = g2.getTransform();
+        AffineTransform at = new AffineTransform();
+
+        if (dir == 2) {
+            // EAST: horizontal flip in-place
+            at.translate(x + w, y);
+            at.scale(-1, 1);
+        } else if (dir == 1) {
+            // NORTH: rotate 90 degrees clockwise from WEST
+            at.translate(x + w / 2.0, y + h / 2.0);
+            at.rotate(Math.PI / 2.0);
+            at.translate(-w / 2.0, -h / 2.0);
+        } else if (dir == 3) {
+            // SOUTH: rotate 90 degrees counterclockwise from WEST
+            at.translate(x + w / 2.0, y + h / 2.0);
+            at.rotate(-Math.PI / 2.0);
+            at.translate(-w / 2.0, -h / 2.0);
+        } else {
+            at.translate(x, y);
+        }
+
+        g2.drawImage(img, at, null);
+        g2.setTransform(old);
     }
 
     private void drawTrafficLight(Graphics2D g2, game.building.TrafficLight light) {
