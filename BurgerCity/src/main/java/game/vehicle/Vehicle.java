@@ -349,6 +349,19 @@ public class Vehicle {
         return currentTileY;
     }
 
+    /**
+     * Direction intended for rendering.
+     * 0=none, 1=N, 2=E, 3=S, 4=W.
+     */
+    public int getRenderDirection() {
+        int dir = currentDirection;
+        if (dir != 0) return dir;
+        if (targetTileX != null && targetTileY != null) {
+            return getPlannedDirection(targetTileX, targetTileY);
+        }
+        return 0;
+    }
+
     public boolean isSpawned() {
         return targetTileX != null || (worldX != 0 || worldY != 0);
     }
