@@ -79,6 +79,9 @@ public class Vehicle {
 
     // Traffic management: direction on current tile (0=none, 1=N, 2=E, 3=S, 4=W)
     protected int currentDirection = 0;
+
+    // UI-only: last non-zero direction used for rendering to avoid flicker.
+    private int lastRenderDirection = 0;
     // Effective speed considering traffic ahead
     protected double effectiveSpeed;
     // Track when this vehicle started approaching an intersection
@@ -354,12 +357,18 @@ public class Vehicle {
      * 0=none, 1=N, 2=E, 3=S, 4=W.
      */
     public int getRenderDirection() {
-        int dir = currentDirection;
-        if (dir != 0) return dir;
+        int planned = 0;
         if (targetTileX != null && targetTileY != null) {
-            return getPlannedDirection(targetTileX, targetTileY);
+            planned = getPlannedDirection(targetTileX, targetTileY);
         }
-        return 0;
+
+        int dir = (planned != 0) ? planned : currentDirection;
+        if (dir != 0) {
+            lastRenderDirection = dir;
+            return dir;
+        }
+
+        return lastRenderDirection;
     }
 
     public boolean isSpawned() {
@@ -376,6 +385,7 @@ public class Vehicle {
         this.lastMoveDx = 0;
         this.lastMoveDy = 0;
         this.currentDirection = 0;
+        this.lastRenderDirection = 0;
         this.intersectionClaimX = null;
         this.intersectionClaimY = null;
         this.worldX = tileCenterX(tileX);
