@@ -39,8 +39,3 @@ A járművásárlás opciót kiválasztva egy garázsra kattintunk. Ez után be�
 A Dashboardról leolvasott információk alapján nyomon tudjuk követni a játék jelenlegi állapotát, és meg tudjuk hozni a szükséges döntéseket.
 
 ![egy random játék](randomgame.png)
-
-# Nézd meg a bemutató videót!
-![Bemutató videó](bemutato_video.MOV)
-
-# JÓ JÁTÉKOT!!
