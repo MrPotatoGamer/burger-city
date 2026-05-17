@@ -2,9 +2,9 @@ package game.building;
 
 public class Bakery extends Building {
 
-    public static final int COST = 1000;
+    public static final int COST = 1600;
 
     public Bakery(int x, int y) {
-        super("Bakery", COST, x, y);
+        super("Pékség", COST, x, y);
     }
 }

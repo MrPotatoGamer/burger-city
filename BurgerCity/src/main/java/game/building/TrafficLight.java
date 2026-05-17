@@ -4,7 +4,7 @@ import game.save.GameSnapshot;
 
 public class TrafficLight extends Building {
 
-    public static final int COST = 1000;
+    public static final int COST = 300;
 
     // States: MAIN_GREEN, CROSS_GREEN
     private String currentState;
@@ -13,7 +13,7 @@ public class TrafficLight extends Building {
     private double greenDurationCross;  // Green light duration for cross direction (seconds)
 
     public TrafficLight(int x, int y) {
-        super("TrafficLight", COST, x, y);
+        super("Forgalmi lámpa", COST, x, y);
         this.currentState = "MAIN_GREEN";
         this.timeInCurrentState = 0.0;
         this.greenDurationMain = 5.0;

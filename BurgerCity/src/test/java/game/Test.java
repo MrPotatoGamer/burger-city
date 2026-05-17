@@ -8,7 +8,7 @@ class ExampleTest {
 
     @Test
     void testResourceTypeDisplayName() {
-        assertEquals("Wheat", ResourceType.WHEAT.getDisplayName());
+        assertEquals("Búza", ResourceType.WHEAT.getDisplayName());
         assertEquals("Hamburger", ResourceType.HAMBURGER.getDisplayName());
     }
 }

@@ -1,12 +1,12 @@
 package game.resource;
 
 public enum ResourceType {
-    WHEAT("Wheat"),
-    MEAT("Meat"),
-    BREAD("Bread"),
-    MEAT_PATTY("Meat Patty"),
+    WHEAT("Búza"),
+    MEAT("Hús"),
+    BREAD("Kenyer"),
+    MEAT_PATTY("Húspogácsa"),
     HAMBURGER("Hamburger"),
-    PASSENGERS("Passengers");
+    PASSENGERS("Utasok");
 
     private final String displayName;
 

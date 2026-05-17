@@ -57,7 +57,7 @@ public class GameDashboard extends JPanel {
         setPreferredSize(new Dimension(310, 0));
 
         // Header
-        header = new JLabel("  \uD83D\uDCCA Game Dashboard", SwingConstants.LEFT);
+        header = new JLabel("  \uD83D\uDCCA Játék vezérlőpult", SwingConstants.LEFT);
         header.setFont(new Font("SansSerif", Font.BOLD, 16));
         header.setForeground(ACCENT_GOLD);
         header.setBackground(BG_DARK);
@@ -177,9 +177,9 @@ public class GameDashboard extends JPanel {
     // ─── Finance ────────────────────────────────────────────────────
 
     private JPanel buildFinanceSection() {
-        JPanel panel = createSection("\uD83D\uDCB0 Finances");
+        JPanel panel = createSection("\uD83D\uDCB0 Pénzügyek");
 
-        addRow(panel, "Balance:", formatMoney(player.getMoney()),
+        addRow(panel, "Egyenleg:", formatMoney(player.getMoney()),
                 player.getMoney() >= 1000 ? ACCENT_GREEN : ACCENT_RED);
 
         int busCount = 0, truckCount = 0;
@@ -188,8 +188,8 @@ public class GameDashboard extends JPanel {
             else if (v instanceof Truck) truckCount++;
         }
         int maintenancePerTick = busCount * 2 + truckCount * 3;
-        addRow(panel, "Vehicles running:", String.valueOf(vehicles.size()), TEXT_PRIMARY);
-        addRow(panel, "Est. maintenance:", maintenancePerTick + "$/tick", ACCENT_ORANGE);
+        addRow(panel, "Működő járművek:", String.valueOf(vehicles.size()), TEXT_PRIMARY);
+        addRow(panel, "Becsült karbantartás:", maintenancePerTick + "$/tick", ACCENT_ORANGE);
 
         return panel;
     }
@@ -197,10 +197,10 @@ public class GameDashboard extends JPanel {
     // ─── Vehicles ───────────────────────────────────────────────────
 
     private JPanel buildVehicleSummarySection() {
-        JPanel panel = createSection("\uD83D\uDE8C Vehicles (" + vehicles.size() + ")");
+        JPanel panel = createSection("\uD83D\uDE8C Járművek (" + vehicles.size() + ")");
 
         if (vehicles.isEmpty()) {
-            addInfoRow(panel, "No vehicles yet. Buy one!", TEXT_SECONDARY);
+            addInfoRow(panel, "Még nincs jármű. Vegyél egyet!", TEXT_SECONDARY);
             return panel;
         }
 
@@ -225,13 +225,13 @@ public class GameDashboard extends JPanel {
             }
         }
 
-        addRow(panel, "\uD83D\uDE8D Buses:", busCount + " (carrying: " + busesCarrying + ")", ACCENT_BLUE);
+        addRow(panel, "\uD83D\uDE8D Buszok:", busCount + " (szállít: " + busesCarrying + ")", ACCENT_BLUE);
         if (totalPassengers > 0) {
-            addRow(panel, "   Passengers on board:", String.valueOf(totalPassengers), TEXT_SECONDARY);
+            addRow(panel, "   Utasok a fedélzeten:", String.valueOf(totalPassengers), TEXT_SECONDARY);
         }
-        addRow(panel, "\uD83D\uDE9A Trucks:", truckCount + " (carrying: " + trucksCarrying + ")", ACCENT_ORANGE);
+        addRow(panel, "\uD83D\uDE9A Teherautók:", truckCount + " (szállít: " + trucksCarrying + ")", ACCENT_ORANGE);
         if (totalGoods > 0) {
-            addRow(panel, "   Goods on board:", String.valueOf(totalGoods), TEXT_SECONDARY);
+            addRow(panel, "   Áruk a fedélzeten:", String.valueOf(totalGoods), TEXT_SECONDARY);
         }
 
         // Individual vehicle details
@@ -252,8 +252,8 @@ public class GameDashboard extends JPanel {
                     ? String.format("Maint: %.0fs", v.getMaintenanceSecondsRemaining())
                     : String.format("Maint in: %.0fs", v.getSecondsUntilMaintenanceDue());
 
-            addVehicleRow(panel,
-                    " #" + idx + " " + type + " | " + status + " | " + cargo + " | age " + age + " | " + maint + " " + pos,
+                addVehicleRow(panel,
+                    " #" + idx + " " + type + " | " + status + " | " + cargo + " | kor " + age + " | " + maint + " " + pos,
                     v);
             idx++;
         }
@@ -265,10 +265,10 @@ public class GameDashboard extends JPanel {
 
     private JPanel buildGaragesSection() {
         List<Garage> garages = map.getGarages();
-        JPanel panel = createSection("\uD83C\uDFE0 Garages (" + garages.size() + ")");
+        JPanel panel = createSection("\uD83C\uDFE0 Garázsok (" + garages.size() + ")");
 
         if (garages.isEmpty()) {
-            addInfoRow(panel, "No garages yet. Build one to enable maintenance.", TEXT_SECONDARY);
+            addInfoRow(panel, "Még nincs garázs. Építs egyet a karbantartáshoz.", TEXT_SECONDARY);
             return panel;
         }
 
@@ -283,7 +283,7 @@ public class GameDashboard extends JPanel {
             }
 
             panel.add(Box.createVerticalStrut(2));
-            addRow(panel, "\u25A0 Garage", "(" + g.getX() + ", " + g.getY() + ") | vehicles: " + homeCount + " | maint: " + maintHere,
+                addRow(panel, "\u25A0 Garázs", "(" + g.getX() + ", " + g.getY() + ") | járművek: " + homeCount + " | karb: " + maintHere,
                     homeCount > 0 ? ACCENT_GREEN : TEXT_SECONDARY);
 
             for (Vehicle v : vehicles) {
@@ -296,7 +296,7 @@ public class GameDashboard extends JPanel {
                         ? String.format("Maint: %.0fs", v.getMaintenanceSecondsRemaining())
                         : String.format("Maint in: %.0fs", v.getSecondsUntilMaintenanceDue());
 
-                addVehicleRow(panel, "   - " + type + " | age " + age + " | " + maint + " | " + formatVehicleStatus(v), v);
+                addVehicleRow(panel, "   - " + type + " | kor " + age + " | " + maint + " | " + formatVehicleStatus(v), v);
             }
         }
 
@@ -319,7 +319,7 @@ public class GameDashboard extends JPanel {
         row.add(lbl, BorderLayout.CENTER);
 
         if (v != null && v.isTooOld()) {
-            JButton sellBtn = new JButton("Sell");
+            JButton sellBtn = new JButton("Elad");
             sellBtn.setFont(new Font("SansSerif", Font.BOLD, 10));
             sellBtn.setForeground(ACCENT_RED);
             sellBtn.setBackground(parent.getBackground());
@@ -338,31 +338,31 @@ public class GameDashboard extends JPanel {
     }
 
     private String formatVehicleStatus(Vehicle v) {
-        if (v == null) return "Unknown";
-        if (v.isInMaintenance()) return "Maintenance";
-        if (v.isGoingToMaintenance()) return "To garage";
-        if (v.hasPath()) return "En route";
-        return "Idle";
+        if (v == null) return "Ismeretlen";
+        if (v.isInMaintenance()) return "Karbantartás";
+        if (v.isGoingToMaintenance()) return "Szervizre";
+        if (v.hasPath()) return "Úton";
+        return "Áll";
     }
 
     // ─── Cities ─────────────────────────────────────────────────────
 
     private JPanel buildCitiesSection() {
-        JPanel panel = createSection("\uD83C\uDFD9 Cities (" + map.getCities().size() + ")");
+        JPanel panel = createSection("\uD83C\uDFD9 Városok (" + map.getCities().size() + ")");
 
         for (City city : map.getCities()) {
             panel.add(Box.createVerticalStrut(2));
-            addRow(panel, "\u25A0 " + city.getName(), "Pop: " + formatNumber(city.getPopulation()), ACCENT_BLUE);
-            addRow(panel, "   Passengers waiting:",
-                    String.valueOf(city.getWaiting().get(ResourceType.PASSENGERS)), TEXT_SECONDARY);
-            addRow(panel, "   Passenger rate:",
-                    String.format("%.2f/s", city.getPassengersPerSecond()), TEXT_SECONDARY);
+            addRow(panel, "\u25A0 " + city.getName(), "Népesség: " + formatNumber(city.getPopulation()), ACCENT_BLUE);
+            addRow(panel, "   Várakozó utasok:",
+                String.valueOf(city.getWaiting().get(ResourceType.PASSENGERS)), TEXT_SECONDARY);
+            addRow(panel, "   Utashozam:",
+                String.format("%.2f/s", city.getPassengersPerSecond()), TEXT_SECONDARY);
 
             // Demand backlog
             var backlog = city.getDemandBacklog().asUnmodifiableMap();
             if (!backlog.isEmpty()) {
                 for (var entry : backlog.entrySet()) {
-                    addRow(panel, "   Demand (" + entry.getKey().getDisplayName() + "):",
+                    addRow(panel, "   Kereslet (" + entry.getKey().getDisplayName() + "):",
                             String.valueOf(entry.getValue()), ACCENT_ORANGE);
                 }
             }
@@ -370,7 +370,7 @@ public class GameDashboard extends JPanel {
             // Goods demand rates
             var goodsRates = city.getGoodsPerSecond();
             for (var entry : goodsRates.entrySet()) {
-                addRow(panel, "   " + entry.getKey().getDisplayName() + " demand:",
+                addRow(panel, "   " + entry.getKey().getDisplayName() + " kereslet:",
                         String.format("%.3f/s", entry.getValue()), TEXT_SECONDARY);
             }
         }
@@ -381,7 +381,7 @@ public class GameDashboard extends JPanel {
     // ─── Industries ─────────────────────────────────────────────────
 
     private JPanel buildIndustriesSection() {
-        JPanel panel = createSection("\uD83C\uDFED Industries (" + map.getIndustries().size() + ")");
+        JPanel panel = createSection("\uD83C\uDFED Iparok (" + map.getIndustries().size() + ")");
 
         for (Industry ind : map.getIndustries()) {
             panel.add(Box.createVerticalStrut(2));
@@ -393,29 +393,29 @@ public class GameDashboard extends JPanel {
             addRow(panel, "\u25A0 " + ind.getName(),
                     ind.getIndustryType().name() + " [" + prodPercent + "]", prodColor);
 
-            // Inputs
+            // Bemenetek
             var inputs = ind.getProfile().getInputsPerUnit();
             if (inputs.isEmpty()) {
-                addRow(panel, "   Inputs:", "None (raw producer)", TEXT_SECONDARY);
+                addRow(panel, "   Bemenetek:", "Nincs (nyersanyag-termelő)", TEXT_SECONDARY);
             } else {
                 for (var e : inputs.entrySet()) {
                     int stored = ind.getStorage().get(e.getKey());
-                    addRow(panel, "   Needs " + e.getKey().getDisplayName() + ":",
-                            e.getValue() + "/unit (stored: " + stored + ")",
+                    addRow(panel, "   Szükséges " + e.getKey().getDisplayName() + ":",
+                            e.getValue() + "/unit (raktáron: " + stored + ")",
                             stored > 0 ? ACCENT_GREEN : ACCENT_RED);
                 }
             }
 
-            // Outputs
+            // Kimenetek
             var outputs = ind.getProfile().getOutputsPerUnit();
             for (var e : outputs.entrySet()) {
                 int stored = ind.getStorage().get(e.getKey());
-                addRow(panel, "   Produces " + e.getKey().getDisplayName() + ":",
-                        e.getValue() + "/unit (stored: " + stored + ")",
+                addRow(panel, "   Termel " + e.getKey().getDisplayName() + ":",
+                        e.getValue() + "/unit (raktáron: " + stored + ")",
                         stored > 0 ? ACCENT_GREEN : TEXT_SECONDARY);
             }
 
-            addRow(panel, "   Base rate:",
+            addRow(panel, "   Alapsebesség:",
                     String.format("%.2f units/s", ind.getProfile().getBaseUnitsPerSecond()), TEXT_SECONDARY);
         }
 
@@ -425,7 +425,7 @@ public class GameDashboard extends JPanel {
     // ─── Supply Chain Overview ───────────────────────────────────────
 
     private JPanel buildSupplyChainSection() {
-        JPanel panel = createSection("\uD83D\uDD17 Supply Chain");
+        JPanel panel = createSection("\uD83D\uDD17 Ellátási lánc");
 
         addInfoRow(panel, "FARM \u2192 Wheat", TEXT_SECONDARY);
         addInfoRow(panel, "RANCH \u2192 Meat", TEXT_SECONDARY);
@@ -433,7 +433,7 @@ public class GameDashboard extends JPanel {
         addInfoRow(panel, "Meat \u2192 PATTY PLANT \u2192 Meat Patty", TEXT_SECONDARY);
         addInfoRow(panel, "Bread + Meat Patty \u2192 BURGER FACTORY \u2192 \uD83C\uDF54", TEXT_SECONDARY);
         panel.add(Box.createVerticalStrut(4));
-        addInfoRow(panel, "Deliver Hamburgers to cities for max profit!", ACCENT_GOLD);
+        addInfoRow(panel, "Szállíts hamburgereket a városokba a maximális profitért!", ACCENT_GOLD);
 
         return panel;
     }
@@ -447,7 +447,7 @@ public class GameDashboard extends JPanel {
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.setBorder(new EmptyBorder(4, 6, 4, 6));
 
-        JButton backBtn = new JButton("\u2190 Back to Overview");
+        JButton backBtn = new JButton("\u2190 Vissza az áttekintéshez");
         backBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
         backBtn.setForeground(ACCENT_BLUE);
         backBtn.setBackground(BG_SECTION);
@@ -466,23 +466,23 @@ public class GameDashboard extends JPanel {
         JPanel panel = createSection("\uD83C\uDFD9 " + city.getName());
 
         // General info
-        addRow(panel, "Population:", formatNumber(city.getPopulation()), ACCENT_BLUE);
-        addRow(panel, "Location:", "(" + city.getOriginX() + ", " + city.getOriginY() + ")", TEXT_SECONDARY);
-        addRow(panel, "Size:", city.getWidth() + " x " + city.getHeight() + " tiles", TEXT_SECONDARY);
+        addRow(panel, "Népesség:", formatNumber(city.getPopulation()), ACCENT_BLUE);
+        addRow(panel, "Hely:", "(" + city.getOriginX() + ", " + city.getOriginY() + ")", TEXT_SECONDARY);
+        addRow(panel, "Méret:", city.getWidth() + " x " + city.getHeight() + " tiles", TEXT_SECONDARY);
 
         panel.add(Box.createVerticalStrut(6));
-        addSectionDivider(panel, "\uD83D\uDE8D Passengers");
+        addSectionDivider(panel, "\uD83D\uDE8D Utasok");
 
         int passengersWaiting = city.getWaiting().get(ResourceType.PASSENGERS);
         Color waitColor = passengersWaiting > 20 ? ACCENT_RED
                 : passengersWaiting > 5 ? ACCENT_ORANGE : ACCENT_GREEN;
-        addRow(panel, "Waiting:", String.valueOf(passengersWaiting), waitColor);
-        addRow(panel, "Generation rate:", String.format("%.3f /s", city.getPassengersPerSecond()), TEXT_SECONDARY);
+        addRow(panel, "Várakozó:", String.valueOf(passengersWaiting), waitColor);
+        addRow(panel, "Generálási ráta:", String.format("%.3f /s", city.getPassengersPerSecond()), TEXT_SECONDARY);
 
         if (passengersWaiting > 20) {
-            addInfoRow(panel, "  \u26A0 Passengers piling up! Add more buses.", ACCENT_RED);
+            addInfoRow(panel, "  \u26A0 Utasok torlódnak! Adj hozzá több buszt.", ACCENT_RED);
         } else if (passengersWaiting == 0) {
-            addInfoRow(panel, "  \u2713 No passengers waiting.", ACCENT_GREEN);
+            addInfoRow(panel, "  \u2713 Nincsenek várakozó utasok.", ACCENT_GREEN);
         }
 
         // Revenue info for passengers
@@ -554,53 +554,53 @@ public class GameDashboard extends JPanel {
         Color prodColor = ind.getProductivity() >= 0.9 ? ACCENT_GREEN
                 : ind.getProductivity() >= 0.6 ? ACCENT_ORANGE : ACCENT_RED;
 
-        addRow(panel, "Type:", ind.getIndustryType().name(), ACCENT_BLUE);
-        addRow(panel, "Location:", "(" + ind.getOriginX() + ", " + ind.getOriginY() + ")", TEXT_SECONDARY);
-        addRow(panel, "Size:", ind.getWidth() + " x " + ind.getHeight() + " tiles", TEXT_SECONDARY);
-        addRow(panel, "Productivity:", prodPercent, prodColor);
-        addRow(panel, "Base rate:", String.format("%.2f units/s", ind.getProfile().getBaseUnitsPerSecond()), TEXT_SECONDARY);
-        addRow(panel, "Effective rate:", String.format("%.2f units/s",
+        addRow(panel, "Típus:", ind.getIndustryType().name(), ACCENT_BLUE);
+        addRow(panel, "Hely:", "(" + ind.getOriginX() + ", " + ind.getOriginY() + ")", TEXT_SECONDARY);
+        addRow(panel, "Méret:", ind.getWidth() + " x " + ind.getHeight() + " tiles", TEXT_SECONDARY);
+        addRow(panel, "Termelékenység:", prodPercent, prodColor);
+        addRow(panel, "Alapsebesség:", String.format("%.2f units/s", ind.getProfile().getBaseUnitsPerSecond()), TEXT_SECONDARY);
+        addRow(panel, "Hatékony ráta:", String.format("%.2f units/s",
                 ind.getProfile().getBaseUnitsPerSecond() * ind.getProductivity()), prodColor);
 
         panel.add(Box.createVerticalStrut(6));
-        addSectionDivider(panel, "\uD83D\uDCE5 Inputs (per production unit)");
+        addSectionDivider(panel, "\uD83D\uDCE5 Bemenetek (egy egységhez)");
 
         var inputs = ind.getProfile().getInputsPerUnit();
         if (inputs.isEmpty()) {
-            addInfoRow(panel, "  None — this is a raw resource producer!", ACCENT_GREEN);
+            addInfoRow(panel, "  Nincs — ez nyersanyag-termelő!", ACCENT_GREEN);
         } else {
             for (var e : inputs.entrySet()) {
                 int stored = ind.getStorage().get(e.getKey());
                 Color storedColor = stored >= 10 ? ACCENT_GREEN
                         : stored > 0 ? ACCENT_ORANGE : ACCENT_RED;
-                addRow(panel, "  " + e.getKey().getDisplayName() + " needed:", String.valueOf(e.getValue()), TEXT_PRIMARY);
-                addRow(panel, "    In storage:", String.valueOf(stored), storedColor);
+                addRow(panel, "  " + e.getKey().getDisplayName() + " szükséges:", String.valueOf(e.getValue()), TEXT_PRIMARY);
+                addRow(panel, "    Raktáron:", String.valueOf(stored), storedColor);
 
                 if (stored == 0) {
-                    addInfoRow(panel, "    \u26A0 Out of stock! Production halted.", ACCENT_RED);
+                    addInfoRow(panel, "    \u26A0 Elfogyott! A termelés leáll.", ACCENT_RED);
                 } else {
                     int unitsAvailable = stored / e.getValue();
-                    addRow(panel, "    Can produce:", unitsAvailable + " units", TEXT_SECONDARY);
+                    addRow(panel, "    Előállítható egységek:", unitsAvailable + " units", TEXT_SECONDARY);
                 }
             }
         }
 
         panel.add(Box.createVerticalStrut(6));
-        addSectionDivider(panel, "\uD83D\uDCE4 Outputs (per production unit)");
+        addSectionDivider(panel, "\uD83D\uDCE4 Kimenetek (egy egységhez)");
 
         var outputs = ind.getProfile().getOutputsPerUnit();
         if (outputs.isEmpty()) {
-            addInfoRow(panel, "  None — this industry has no outputs.", TEXT_SECONDARY);
+            addInfoRow(panel, "  Nincs — ennek az iparnak nincs kimenete.", TEXT_SECONDARY);
         } else {
             for (var e : outputs.entrySet()) {
                 int stored = ind.getStorage().get(e.getKey());
                 Color storedColor = stored > 0 ? ACCENT_GREEN : TEXT_SECONDARY;
-                addRow(panel, "  " + e.getKey().getDisplayName() + " produced:", String.valueOf(e.getValue()), TEXT_PRIMARY);
-                addRow(panel, "    In storage:", String.valueOf(stored), storedColor);
+                addRow(panel, "  " + e.getKey().getDisplayName() + " termelt:", String.valueOf(e.getValue()), TEXT_PRIMARY);
+                addRow(panel, "    Raktáron:", String.valueOf(stored), storedColor);
                 int rev = ResourcePrices.revenuePerUnit(e.getKey());
-                addRow(panel, "    Value per unit:", rev + "$", ACCENT_GREEN);
+                addRow(panel, "    Egységár:", rev + "$/unit", ACCENT_GREEN);
                 if (stored > 0) {
-                    addRow(panel, "    Total value in stock:", stored * rev + "$", ACCENT_GOLD);
+                    addRow(panel, "    Összérték raktárban:", stored * rev + "$/unit", ACCENT_GOLD);
                 }
             }
         }
@@ -626,27 +626,27 @@ public class GameDashboard extends JPanel {
 
         switch (ind.getIndustryType()) {
             case FARM -> {
-                addInfoRow(panel, "  \u2022 Produces Wheat — deliver to a Bakery.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Termel búzát — szállíts egy pékhez.", TEXT_SECONDARY);
             }
             case RANCH -> {
-                addInfoRow(panel, "  \u2022 Produces Meat — deliver to a Patty Plant.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Termel húst — szállíts egy húsgyárba.", TEXT_SECONDARY);
             }
             case BAKERY -> {
-                addInfoRow(panel, "  \u2022 Needs Wheat, produces Bread.", TEXT_SECONDARY);
-                addInfoRow(panel, "  \u2022 Deliver Bread to a Burger Factory.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Szükséges búza, termel kenyeret.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Szállíts kenyeret egy hamburgergyárba.", TEXT_SECONDARY);
             }
             case PATTY_PLANT -> {
-                addInfoRow(panel, "  \u2022 Needs Meat, produces Meat Patties.", TEXT_SECONDARY);
-                addInfoRow(panel, "  \u2022 Deliver Patties to a Burger Factory.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Szükséges hús, termel húspogácsát.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Szállíts pogácsákat egy hamburgergyárba.", TEXT_SECONDARY);
             }
             case BURGER_FACTORY -> {
-                addInfoRow(panel, "  \u2022 Needs Bread + Meat Patties.", TEXT_SECONDARY);
-                addInfoRow(panel, "  \u2022 Produces Hamburgers — deliver to cities!", TEXT_SECONDARY);
-                addInfoRow(panel, "  \u2022 Hamburgers = highest revenue ("
+                addInfoRow(panel, "  \u2022 Szükséges kenyér + húspogácsák.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Termel hamburgereket — szállíts a városoknak!", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 A hamburgerek a legnagyobb bevételt adják ("
                         + ResourcePrices.revenuePerUnit(ResourceType.HAMBURGER) + "$/unit).", ACCENT_GOLD);
             }
             case FACTORY -> {
-                addInfoRow(panel, "  \u2022 Generic factory — no production set up.", TEXT_SECONDARY);
+                addInfoRow(panel, "  \u2022 Általános gyár — nincs beállított termelés.", TEXT_SECONDARY);
             }
         }
 
@@ -707,7 +707,7 @@ public class GameDashboard extends JPanel {
     // ─── Price Table ────────────────────────────────────────────────
 
     private JPanel buildPriceTableSection() {
-        JPanel panel = createSection("\uD83D\uDCB5 Revenue per Delivery");
+        JPanel panel = createSection("\uD83D\uDCB5 Bevétel szállításonként");
 
         for (ResourceType type : ResourceType.values()) {
             int price = ResourcePrices.revenuePerUnit(type);

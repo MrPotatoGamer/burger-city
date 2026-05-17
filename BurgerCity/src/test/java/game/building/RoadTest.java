@@ -14,18 +14,18 @@ class RoadTest {
     @Test
     void testRoadName() {
         Road road = new Road(0, 0);
-        assertEquals("Road", road.getName());
+        assertEquals("Út", road.getName());
     }
 
     @Test
     void testRoadCost() {
         Road road = new Road(0, 0);
-        assertEquals(100, road.getCost());
+        assertEquals(60, road.getCost());
     }
 
     @Test
     void testRoadCostConstant() {
-        assertEquals(100, Road.COST);
+        assertEquals(60, Road.COST);
     }
 
     @Test

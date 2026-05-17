@@ -30,11 +30,59 @@ import java.util.List;
 
 public class GameUI extends JFrame {
 
-    private static final int VEHICLE_COST = 500;
-    private static final int BUILDING_COST = 1000;
-    private static final int INDUSTRY_COST = 1000;
+    private static final int BUS_COST = 900;
+    private static final int TRUCK_COST = 1100;
+    private static final int ADVANCED_BUS_COST = 1600;
+    private static final int ADVANCED_TRUCK_COST = 1900;
+
+    private static final int FARM_COST = 1200;
+    private static final int RANCH_COST = 1400;
+    private static final int BAKERY_COST = 1600;
+    private static final int PATTY_PLANT_COST = 1800;
+    private static final int BURGER_FACTORY_COST = 2200;
 
     private static final int ROAD_CLEAR_COST_PER_TREE = 25;
+
+    private static int vehicleCostByChoice(int choice) {
+        return switch (choice) {
+            case 0 -> BUS_COST;
+            case 1 -> TRUCK_COST;
+            case 2 -> ADVANCED_BUS_COST;
+            case 3 -> ADVANCED_TRUCK_COST;
+            default -> BUS_COST;
+        };
+    }
+
+    private static String vehicleNameByChoice(int choice) {
+        return switch (choice) {
+            case 0 -> "Busz";
+            case 1 -> "Teherautó";
+            case 2 -> "Fejlett busz";
+            case 3 -> "Fejlett teherautó";
+            default -> "Busz";
+        };
+    }
+
+    private static int buildableBuildingCost(BuildableBuilding b) {
+        if (b == null) return 0;
+        return switch (b) {
+            case GARAGE -> Garage.COST;
+            case STOP -> Stop.COST;
+            case TRAFFIC_LIGHT -> TrafficLight.COST;
+        };
+    }
+
+    private static int industryCost(IndustryType type) {
+        if (type == null) return 0;
+        return switch (type) {
+            case FARM -> FARM_COST;
+            case RANCH -> RANCH_COST;
+            case BAKERY -> BAKERY_COST;
+            case PATTY_PLANT -> PATTY_PLANT_COST;
+            case BURGER_FACTORY -> BURGER_FACTORY_COST;
+            case FACTORY -> BAKERY_COST;
+        };
+    }
 
     private MapRenderer mapRenderer;
     private Map map;
@@ -45,6 +93,9 @@ public class GameUI extends JFrame {
     private JButton buildRoadButton;
     private boolean buyVehicleMode = false;
     private JButton buyVehicleButton;
+
+    private boolean sellVehicleMode = false;
+    private JButton sellVehicleButton;
 
     private boolean buyBuildingMode = false;
     private JButton buyBuildingButton;
@@ -116,7 +167,7 @@ public class GameUI extends JFrame {
             timeManager = new TimeManager();
 
             // Játékos létrehozása kezdőpénzzel
-            player = new Player(10000);
+            player = new Player(15000);
 
             // Térkép létrehozása és betöltése
             map = new Map(50, 40);
@@ -153,6 +204,8 @@ public class GameUI extends JFrame {
                     handleRoadBuild(e.getX(), e.getY());
                 } else if (buyVehicleMode && !wasDragged[0]) {
                     handleBuyVehicleClick(e.getX(), e.getY());
+                } else if (sellVehicleMode && !wasDragged[0]) {
+                    handleSellVehicleClick(e.getX(), e.getY());
                 } else if (buyBuildingMode && !wasDragged[0]) {
                     handleBuildingBuild(e.getX(), e.getY());
                 } else if (buyIndustryMode && !wasDragged[0]) {
@@ -233,6 +286,11 @@ public class GameUI extends JFrame {
         styleButton(buyVehicleButton, new Color(65, 105, 225));
         topPanel.add(buyVehicleButton);
 
+        sellVehicleButton = new JButton("Jármű eladás");
+        sellVehicleButton.addActionListener(e -> toggleSellVehicleMode());
+        styleButton(sellVehicleButton, new Color(178, 34, 34));
+        topPanel.add(sellVehicleButton);
+
         buyBuildingButton = new JButton("Épület vásárlás");
         buyBuildingButton.addActionListener(e -> toggleBuyBuildingMode());
         styleButton(buyBuildingButton, new Color(184, 134, 11));
@@ -258,7 +316,7 @@ public class GameUI extends JFrame {
         styleButton(loadGameButton, new Color(100, 149, 237));
         topPanel.add(loadGameButton);
 
-        toggleDashboardButton = new JButton("Dashboard \u25C0");
+        toggleDashboardButton = new JButton("Vezérlőpult \u25C0");
         toggleDashboardButton.addActionListener(e -> toggleDashboard());
         styleButton(toggleDashboardButton, new Color(105, 105, 105));
         topPanel.add(toggleDashboardButton);
@@ -382,6 +440,11 @@ public class GameUI extends JFrame {
                 buyVehicleButton.setText("Jármű vásárlás");
                 clearVehicleSelection();
             }
+            if (sellVehicleMode) {
+                sellVehicleMode = false;
+                sellVehicleButton.setBackground(null);
+                sellVehicleButton.setText("Jármű eladás");
+            }
             if (buyBuildingMode) {
                 buyBuildingMode = false;
                 buyBuildingButton.setBackground(null);
@@ -418,6 +481,11 @@ public class GameUI extends JFrame {
                 buildRoadButton.setBackground(null);
                 buildRoadButton.setText("Út építés (" + Road.COST + "$)");
             }
+            if (sellVehicleMode) {
+                sellVehicleMode = false;
+                sellVehicleButton.setBackground(null);
+                sellVehicleButton.setText("Jármű eladás");
+            }
             if (buyBuildingMode) {
                 buyBuildingMode = false;
                 buyBuildingButton.setBackground(null);
@@ -436,7 +504,7 @@ public class GameUI extends JFrame {
                 demolishButton.setText("Rombolás");
             }
             buyVehicleButton.setBackground(Color.GREEN);
-            buyVehicleButton.setText("Jármű vásárlás BE (" + VEHICLE_COST + "$)");
+            buyVehicleButton.setText("Jármű vásárlás BE (ár típustól függ)");
             clearVehicleSelection();
             updateStatus("Kattints egy garázsra, majd válassz buildingeket. Kattints újra az elsőre a körút lezárásához.");
         } else {
@@ -444,6 +512,48 @@ public class GameUI extends JFrame {
             buyVehicleButton.setText("Jármű vásárlás");
             clearVehicleSelection();
             updateStatus("Jármű vásárlás mód kikapcsolva.");
+        }
+    }
+
+    private void toggleSellVehicleMode() {
+        sellVehicleMode = !sellVehicleMode;
+        if (sellVehicleMode) {
+            if (roadBuildMode) {
+                roadBuildMode = false;
+                buildRoadButton.setBackground(null);
+                buildRoadButton.setText("Út építés (" + Road.COST + "$)");
+            }
+            if (buyVehicleMode) {
+                buyVehicleMode = false;
+                buyVehicleButton.setBackground(null);
+                buyVehicleButton.setText("Jármű vásárlás");
+                clearVehicleSelection();
+            }
+            if (buyBuildingMode) {
+                buyBuildingMode = false;
+                buyBuildingButton.setBackground(null);
+                buyBuildingButton.setText("Épület vásárlás");
+                selectedBuildableBuilding = null;
+            }
+            if (buyIndustryMode) {
+                buyIndustryMode = false;
+                buyIndustryButton.setBackground(null);
+                buyIndustryButton.setText("Industry vásárlás");
+                selectedIndustryType = null;
+            }
+            if (demolishMode) {
+                demolishMode = false;
+                demolishButton.setBackground(null);
+                demolishButton.setText("Rombolás");
+            }
+
+            sellVehicleButton.setBackground(Color.GREEN);
+            sellVehicleButton.setText("Jármű eladás BE (50%)");
+            updateStatus("Kattints egy járműre az eladáshoz (50% visszatérítés).");
+        } else {
+            sellVehicleButton.setBackground(null);
+            sellVehicleButton.setText("Jármű eladás");
+            updateStatus("Jármű eladás mód kikapcsolva.");
         }
     }
 
@@ -461,6 +571,11 @@ public class GameUI extends JFrame {
                 buyVehicleButton.setBackground(null);
                 buyVehicleButton.setText("Jármű vásárlás");
                 clearVehicleSelection();
+            }
+            if (sellVehicleMode) {
+                sellVehicleMode = false;
+                sellVehicleButton.setBackground(null);
+                sellVehicleButton.setText("Jármű eladás");
             }
             if (buyIndustryMode) {
                 buyIndustryMode = false;
@@ -484,8 +599,10 @@ public class GameUI extends JFrame {
             }
             selectedBuildableBuilding = chosen;
 
+            int cost = buildableBuildingCost(selectedBuildableBuilding);
+
             buyBuildingButton.setBackground(Color.GREEN);
-            buyBuildingButton.setText("Épület vásárlás BE (" + BUILDING_COST + "$)");
+            buyBuildingButton.setText("Épület vásárlás BE (" + cost + "$)");
             updateStatus("Kattints a térképre az épület lerakásához: " + selectedBuildableBuilding);
         } else {
             buyBuildingButton.setBackground(null);
@@ -502,7 +619,7 @@ public class GameUI extends JFrame {
         // Title panel
         JPanel titlePanel = new JPanel();
         titlePanel.setBackground(new Color(184, 134, 11));
-        JLabel titleLabel = new JLabel("Válassz épület típust (ára: " + BUILDING_COST + "$)");
+        JLabel titleLabel = new JLabel("Válassz épület típust");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
         titleLabel.setForeground(Color.WHITE);
         titlePanel.add(titleLabel);
@@ -513,19 +630,19 @@ public class GameUI extends JFrame {
 
         BuildableBuilding[] result = {null};
 
-        JButton garageBtn = createDialogButton("🏠 Garage", "Járművek tárolása és karbantartása", new Color(70, 130, 180));
+        JButton garageBtn = createDialogButton("🏠 Garage (" + Garage.COST + "$)", "Járművek tárolása és karbantartása", new Color(70, 130, 180));
         garageBtn.addActionListener(e -> {
             result[0] = BuildableBuilding.GARAGE;
             dialog.dispose();
         });
 
-        JButton stopBtn = createDialogButton("🚏 Stop", "Utasok fel- és leszállása", new Color(34, 139, 34));
+        JButton stopBtn = createDialogButton("🚏 Stop (" + Stop.COST + "$)", "Utasok fel- és leszállása", new Color(34, 139, 34));
         stopBtn.addActionListener(e -> {
             result[0] = BuildableBuilding.STOP;
             dialog.dispose();
         });
 
-        JButton trafficLightBtn = createDialogButton("🚦 Traffic Light", "Forgalom irányítása kereszteződésben", new Color(220, 20, 60));
+        JButton trafficLightBtn = createDialogButton("🚦 Traffic Light (" + TrafficLight.COST + "$)", "Forgalom irányítása kereszteződésben", new Color(220, 20, 60));
         trafficLightBtn.addActionListener(e -> {
             result[0] = BuildableBuilding.TRAFFIC_LIGHT;
             dialog.dispose();
@@ -568,6 +685,11 @@ public class GameUI extends JFrame {
                 buyVehicleButton.setText("Jármű vásárlás");
                 clearVehicleSelection();
             }
+            if (sellVehicleMode) {
+                sellVehicleMode = false;
+                sellVehicleButton.setBackground(null);
+                sellVehicleButton.setText("Jármű eladás");
+            }
             if (buyBuildingMode) {
                 buyBuildingMode = false;
                 buyBuildingButton.setBackground(null);
@@ -590,8 +712,10 @@ public class GameUI extends JFrame {
             }
             selectedIndustryType = chosen;
 
+            int cost = industryCost(selectedIndustryType);
+
             buyIndustryButton.setBackground(Color.GREEN);
-            buyIndustryButton.setText("Industry vásárlás BE (" + INDUSTRY_COST + "$)");
+            buyIndustryButton.setText("Industry vásárlás BE (" + cost + "$)");
             updateStatus("Kattints a térképre az industry lerakásához (2x2): " + selectedIndustryType);
         } else {
             buyIndustryButton.setBackground(null);
@@ -608,7 +732,7 @@ public class GameUI extends JFrame {
         // Title panel
         JPanel titlePanel = new JPanel();
         titlePanel.setBackground(new Color(148, 0, 211));
-        JLabel titleLabel = new JLabel("Válassz industry típust (ára: " + INDUSTRY_COST + "$ | foglal: 2x2)");
+        JLabel titleLabel = new JLabel("Válassz industry típust (foglal: 2x2)");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
         titleLabel.setForeground(Color.WHITE);
         titlePanel.add(titleLabel);
@@ -619,31 +743,31 @@ public class GameUI extends JFrame {
 
         IndustryType[] result = {null};
 
-        JButton farmBtn = createDialogButton("🌾 Farm", "Gabona termelés", new Color(107, 142, 35));
+        JButton farmBtn = createDialogButton("🌾 Farm (" + FARM_COST + "$)", "Gabona termelés", new Color(107, 142, 35));
         farmBtn.addActionListener(e -> {
             result[0] = IndustryType.FARM;
             dialog.dispose();
         });
 
-        JButton ranchBtn = createDialogButton("🐄 Ranch", "Állattenyésztés", new Color(160, 82, 45));
+        JButton ranchBtn = createDialogButton("🐄 Ranch (" + RANCH_COST + "$)", "Állattenyésztés", new Color(160, 82, 45));
         ranchBtn.addActionListener(e -> {
             result[0] = IndustryType.RANCH;
             dialog.dispose();
         });
 
-        JButton bakeryBtn = createDialogButton("🍞 Bakery", "Buci készítés", new Color(210, 180, 140));
+        JButton bakeryBtn = createDialogButton("🍞 Bakery (" + BAKERY_COST + "$)", "Buci készítés", new Color(210, 180, 140));
         bakeryBtn.addActionListener(e -> {
             result[0] = IndustryType.BAKERY;
             dialog.dispose();
         });
 
-        JButton pattyBtn = createDialogButton("🥩 Patty Plant", "Húspogácsa előállítás", new Color(178, 34, 34));
+        JButton pattyBtn = createDialogButton("🥩 Patty Plant (" + PATTY_PLANT_COST + "$)", "Húspogácsa előállítás", new Color(178, 34, 34));
         pattyBtn.addActionListener(e -> {
             result[0] = IndustryType.PATTY_PLANT;
             dialog.dispose();
         });
 
-        JButton burgerBtn = createDialogButton("🍔 Burger Factory", "Hamburger készítés", new Color(255, 140, 0));
+        JButton burgerBtn = createDialogButton("🍔 Burger Factory (" + BURGER_FACTORY_COST + "$)", "Hamburger készítés", new Color(255, 140, 0));
         burgerBtn.addActionListener(e -> {
             result[0] = IndustryType.BURGER_FACTORY;
             dialog.dispose();
@@ -687,6 +811,11 @@ public class GameUI extends JFrame {
                 buyVehicleButton.setText("Jármű vásárlás");
                 clearVehicleSelection();
             }
+            if (sellVehicleMode) {
+                sellVehicleMode = false;
+                sellVehicleButton.setBackground(null);
+                sellVehicleButton.setText("Jármű eladás");
+            }
             if (buyBuildingMode) {
                 buyBuildingMode = false;
                 buyBuildingButton.setBackground(null);
@@ -702,7 +831,7 @@ public class GameUI extends JFrame {
 
             demolishButton.setBackground(Color.GREEN);
             demolishButton.setText("Rombolás BE");
-            updateStatus("Kattints egy útra / épületre / industry-re / erdőre a romboláshoz (út: 0$ vissza, épület: 50%, industry: 50%, erdő: +20$/tile).");
+            updateStatus("Kattints egy útra / épületre / industry-re / erdőre a romboláshoz (út: 0$ vissza, épület: 50%, industry: 50%, erdő: +25$/tile).");
         } else {
             demolishButton.setBackground(null);
             demolishButton.setText("Rombolás");
@@ -792,8 +921,9 @@ public class GameUI extends JFrame {
             }
         }
 
-        if (!player.spendMoney(BUILDING_COST)) {
-            updateStatus("Nincs elég pénz az épület vásárlásához! Szükséges: " + BUILDING_COST + "$");
+        int cost = buildableBuildingCost(selectedBuildableBuilding);
+        if (!player.spendMoney(cost)) {
+            updateStatus("Nincs elég pénz az épület vásárlásához! Szükséges: " + cost + "$");
             return;
         }
 
@@ -812,7 +942,7 @@ public class GameUI extends JFrame {
             mapRenderer.repaint();
             updateStatus("Épület sikeresen lerakva: " + building.getName() + " (" + tileX + ", " + tileY + "). Pénz: " + player.getMoney() + "$");
         } else {
-            player.addMoney(BUILDING_COST);
+            player.addMoney(cost);
             if (building instanceof TrafficLight) {
                 updateStatus("Közlekedési lámpát csak kereszteződésre (3 vagy 4 utas) lehet építeni!");
             } else {
@@ -856,8 +986,9 @@ public class GameUI extends JFrame {
             }
         }
 
-        if (!player.spendMoney(INDUSTRY_COST)) {
-            updateStatus("Nincs elég pénz industry vásárlásához! Szükséges: " + INDUSTRY_COST + "$");
+        int cost = industryCost(selectedIndustryType);
+        if (!player.spendMoney(cost)) {
+            updateStatus("Nincs elég pénz industry vásárlásához! Szükséges: " + cost + "$");
             return;
         }
 
@@ -865,7 +996,7 @@ public class GameUI extends JFrame {
             mapRenderer.repaint();
             updateStatus("Industry sikeresen lerakva: " + selectedIndustryType + " (" + tileX + ", " + tileY + ") [2x2]. Pénz: " + player.getMoney() + "$");
         } else {
-            player.addMoney(INDUSTRY_COST);
+            player.addMoney(cost);
             updateStatus("Erre a helyre nem tehető industry (2x2)!");
         }
     }
@@ -913,7 +1044,7 @@ public class GameUI extends JFrame {
                 // Remove vehicles serving this industry
                 removeVehiclesServingBuilding(ind.getOriginX(), ind.getOriginY());
 
-                int refund = INDUSTRY_COST / 2;
+                int refund = industryCost(ind.getIndustryType()) / 2;
                 player.addMoney(refund);
                 mapRenderer.repaint();
                 updateStatus("Industry lerombolva: " + ind.getName() + " (" + ind.getOriginX() + ", " + ind.getOriginY() + ") [" + ind.getIndustryType() + "]. Visszatérítés: " + refund + "$.");
@@ -925,10 +1056,10 @@ public class GameUI extends JFrame {
 
         if (tile.getType() == TileType.FOREST) {
             if (map.demolishForest(tileX, tileY)) {
-                player.addMoney(20);
+                player.addMoney(25);
                 mapRenderer.rebuildGrassLayerCache();
                 mapRenderer.repaint();
-                updateStatus("Erdő kivágva (" + tileX + ", " + tileY + "). Bevétel: +20$. Pénz: " + player.getMoney() + "$");
+                updateStatus("Erdő kivágva (" + tileX + ", " + tileY + "). Bevétel: +25$. Pénz: " + player.getMoney() + "$");
             } else {
                 updateStatus("Itt nincs kivágható erdő.");
             }
@@ -994,6 +1125,65 @@ public class GameUI extends JFrame {
         }
     }
 
+    private void handleSellVehicleClick(int screenX, int screenY) {
+        Vehicle v = findVehicleAtScreen(screenX, screenY);
+        if (v == null) {
+            updateStatus("Kattints egy járműre az eladáshoz!");
+            return;
+        }
+
+        int refund = Math.max(0, v.getSellValue());
+
+        int choice = JOptionPane.showConfirmDialog(
+                this,
+                "Biztos eladod ezt a járművet?\nVisszatérítés: " + refund + "$ (50%)",
+                "Jármű eladás",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.WARNING_MESSAGE
+        );
+        if (choice != JOptionPane.OK_OPTION) {
+            updateStatus("Jármű eladás megszakítva.");
+            return;
+        }
+
+        boolean removed = vehicles.remove(v);
+        if (!removed) {
+            updateStatus("Nem sikerült eladni a járművet (nem található).");
+            return;
+        }
+
+        player.addMoney(refund);
+        mapRenderer.repaint();
+        if (dashboard != null) dashboard.refresh();
+
+        updateStatus("Jármű eladva. Visszatérítés: " + refund + "$ | Pénz: " + player.getMoney() + "$");
+    }
+
+    private Vehicle findVehicleAtScreen(int screenX, int screenY) {
+        Camera camera = mapRenderer.getCamera();
+        double worldX = camera.screenToWorldX(screenX);
+        double worldY = camera.screenToWorldY(screenY);
+
+        Vehicle best = null;
+        double bestDist2 = Double.POSITIVE_INFINITY;
+        double radius = 16.0; // pixels in world-space
+        double r2 = radius * radius;
+
+        for (Vehicle v : vehicles) {
+            if (v == null) continue;
+            if (!v.isSpawned()) continue;
+            double dx = v.getWorldX() - worldX;
+            double dy = v.getWorldY() - worldY;
+            double d2 = dx * dx + dy * dy;
+            if (d2 <= r2 && d2 < bestDist2) {
+                bestDist2 = d2;
+                best = v;
+            }
+        }
+
+        return best;
+    }
+
     private void placeVehicleWithMultiStopRoute() {
         if (selectedGarage == null || selectedGarageRoadX == null || selectedGarageRoadY == null) {
             updateStatus("Nincs kiválasztott garázs. Kattints egy garázsra!");
@@ -1021,28 +1211,27 @@ public class GameUI extends JFrame {
             return;
         }
 
-        if (!player.spendMoney(VEHICLE_COST)) {
-            updateStatus("Nincs elég pénz jármű vásárlásához! Szükséges: " + VEHICLE_COST + "$");
-            return;
-        }
-
         Integer choice = chooseVehicleType();
 
         if (choice == null) {
-            player.addMoney(VEHICLE_COST);
             updateStatus("Jármű vásárlás megszakítva.");
             return;
         }
 
+        int cost = vehicleCostByChoice(choice);
+
         // Bus csak városok között mehet
         if ((choice == 0 || choice == 2) && !allBuildingsAreCities()) {
-            player.addMoney(VEHICLE_COST);
             updateStatus("Bus csak városok között vásárolható (utas szállítás). Minden állomásnak városnak kell lennie!");
             clearVehicleSelection();
             return;
         }
 
-        String[] vehicleNames = {"Bus", "Truck", "Advanced Bus", "Advanced Truck"};
+        if (!player.spendMoney(cost)) {
+            updateStatus("Nincs elég pénz jármű vásárlásához! Szükséges: " + cost + "$");
+            return;
+        }
+
         Vehicle v = switch (choice) {
             case 0 -> new Bus();
             case 1 -> new Truck();
@@ -1051,7 +1240,7 @@ public class GameUI extends JFrame {
             default -> new Bus();
         };
         v.setHomeGarage(selectedGarage);
-        v.setPurchasePrice(VEHICLE_COST);
+        v.setPurchasePrice(cost);
         v.setRoutePath(fullPath);
         v.setRejoinRouteAt(routeStart[0], routeStart[1]);
         v.setPath(fromGarage);
@@ -1063,7 +1252,7 @@ public class GameUI extends JFrame {
         mapRenderer.repaint();
 
         String routeDescription = buildRouteDescription();
-        updateStatus("Jármű megvásárolva garázsból: " + vehicleNames[choice] + " | Körút: " + routeDescription);
+        updateStatus("Jármű megvásárolva garázsból: " + vehicleNameByChoice(choice) + " | Ár: " + cost + "$ | Körút: " + routeDescription);
         clearVehicleSelection();
     }
 
@@ -1152,28 +1341,27 @@ public class GameUI extends JFrame {
             return;
         }
 
-        if (!player.spendMoney(VEHICLE_COST)) {
-            updateStatus("Nincs elég pénz jármű vásárlásához! Szükséges: " + VEHICLE_COST + "$");
-            return;
-        }
-
         Integer choice = chooseVehicleType();
 
         if (choice == null) {
-            player.addMoney(VEHICLE_COST);
             updateStatus("Jármű vásárlás megszakítva.");
             return;
         }
 
+        int cost = vehicleCostByChoice(choice);
+
         // Assignment-aligned constraint: bus transports passengers between cities.
         if ((choice == 0 || choice == 2) && (!isCityBuilding(startBuilding) || !isCityBuilding(endBuilding))) {
-            player.addMoney(VEHICLE_COST);
             updateStatus("Bus csak két város között vásárolható (utas szállítás). Válassz 2 várost!");
             clearVehicleSelection();
             return;
         }
 
-        String[] vehicleNames = {"Bus", "Truck", "Advanced Bus", "Advanced Truck"};
+        if (!player.spendMoney(cost)) {
+            updateStatus("Nincs elég pénz jármű vásárlásához! Szükséges: " + cost + "$");
+            return;
+        }
+
         Vehicle v = switch (choice) {
             case 0 -> new Bus();
             case 1 -> new Truck();
@@ -1182,7 +1370,7 @@ public class GameUI extends JFrame {
             default -> new Bus();
         };
         v.setHomeGarage(selectedGarage);
-        v.setPurchasePrice(VEHICLE_COST);
+        v.setPurchasePrice(cost);
         v.setRoutePath(path);
         v.setRejoinRouteAt(routeStart[0], routeStart[1]);
         v.setPath(fromGarage);
@@ -1190,7 +1378,7 @@ public class GameUI extends JFrame {
                             endBuilding.originX(), endBuilding.originY());
         vehicles.add(v);
         mapRenderer.repaint();
-        updateStatus("Jármű megvásárolva garázsból: " + vehicleNames[choice] + " | Útvonal: " + startBuilding.name() + " -> " + endBuilding.name());
+        updateStatus("Jármű megvásárolva garázsból: " + vehicleNameByChoice(choice) + " | Ár: " + cost + "$ | Útvonal: " + startBuilding.name() + " -> " + endBuilding.name());
         clearVehicleSelection();
     }
 
@@ -1300,10 +1488,10 @@ public class GameUI extends JFrame {
         // Settings panel
         JPanel settingsPanel = new JPanel(new GridLayout(2, 2, 5, 5));
 
-        JLabel mainLabel = new JLabel("North-South (Main) duration (sec):");
+        JLabel mainLabel = new JLabel("Észak-Dél (Fő) időtartam (mp):");
         JTextField mainField = new JTextField(String.valueOf((int)light.getGreenDurationMain()));
-
-        JLabel crossLabel = new JLabel("East-West (Cross) duration (sec):");
+        
+        JLabel crossLabel = new JLabel("Kelet-Nyugat (Keresztező) időtartam (mp):");
         JTextField crossField = new JTextField(String.valueOf((int)light.getGreenDurationCross()));
 
         settingsPanel.add(mainLabel);
@@ -1311,22 +1499,22 @@ public class GameUI extends JFrame {
         settingsPanel.add(crossLabel);
         settingsPanel.add(crossField);
 
-        // Delete button
-        JButton deleteButton = new JButton("Delete Traffic Light");
+        // Törlő gomb
+        JButton deleteButton = new JButton("Lámpa törlése");
         deleteButton.setForeground(Color.RED);
 
         panel.add(settingsPanel, BorderLayout.CENTER);
         panel.add(deleteButton, BorderLayout.SOUTH);
 
-        // Custom dialog with options
-        Object[] options = {"Save", "Cancel"};
+        // Egyedi párbeszéd opciók
+        Object[] options = {"Mentés", "Mégsem"};
         final boolean[] deleted = {false};
 
         deleteButton.addActionListener(e -> {
             int confirm = JOptionPane.showConfirmDialog(
                 this,
-                "Are you sure you want to delete this traffic light?",
-                "Confirm Delete",
+                "Biztosan törölni szeretnéd ezt a forgalmi lámpát?",
+                "Törlés megerősítése",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE
             );
@@ -1358,7 +1546,7 @@ public class GameUI extends JFrame {
         int result = JOptionPane.showOptionDialog(
             this,
             panel,
-            "Traffic Light Settings at (" + light.getX() + ", " + light.getY() + ")",
+            "Forgalmi lámpa beállításai (" + light.getX() + ", " + light.getY() + ")",
             JOptionPane.OK_CANCEL_OPTION,
             JOptionPane.PLAIN_MESSAGE,
             null,
@@ -1373,12 +1561,12 @@ public class GameUI extends JFrame {
                 double crossDuration = Double.parseDouble(crossField.getText());
 
                 if (mainDuration < 1 || crossDuration < 1) {
-                    JOptionPane.showMessageDialog(this, "Durations must be at least 1 second!");
+                    JOptionPane.showMessageDialog(this, "Az időtartam legalább 1 másodperc legyen!");
                     return;
                 }
 
                 light.setDurations(mainDuration, crossDuration);
-                updateStatus("Traffic light settings updated: Main=" + mainDuration + "s, Cross=" + crossDuration + "s");
+                updateStatus("Forgalmi lámpa beállításai frissítve: Fő=" + mainDuration + "s, Keresztező=" + crossDuration + "s");
 
             } catch (NumberFormatException e) {
                 JOptionPane.showMessageDialog(this, "Invalid number format!");
@@ -1388,7 +1576,7 @@ public class GameUI extends JFrame {
 
     private void toggleDashboard() {
         boolean nowVisible = dashboard.toggleVisibility();
-        toggleDashboardButton.setText(nowVisible ? "Dashboard \u25C0" : "Dashboard \u25B6");
+        toggleDashboardButton.setText(nowVisible ? "Vezérlőpult \u25C0" : "Vezérlőpult \u25B6");
 
         // Do not resize the window; only relayout content.
         revalidate();
@@ -1517,7 +1705,7 @@ public class GameUI extends JFrame {
         // Title panel
         JPanel titlePanel = new JPanel();
         titlePanel.setBackground(new Color(65, 105, 225));
-        JLabel titleLabel = new JLabel("Válassz jármű típust (ára: " + VEHICLE_COST + "$)");
+        JLabel titleLabel = new JLabel("Válassz jármű típust");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
         titleLabel.setForeground(Color.WHITE);
         titlePanel.add(titleLabel);
@@ -1528,25 +1716,25 @@ public class GameUI extends JFrame {
 
         Integer[] result = {null};
 
-        JButton busBtn = createDialogButton("🚌 Bus", "Utasok szállítása városok között", new Color(30, 144, 255));
+        JButton busBtn = createDialogButton("🚌 Bus (" + BUS_COST + "$)", "Utasok szállítása városok között", new Color(30, 144, 255));
         busBtn.addActionListener(e -> {
             result[0] = 0;
             dialog.dispose();
         });
 
-        JButton truckBtn = createDialogButton("🚚 Truck", "Áruk szállítása", new Color(70, 130, 180));
+        JButton truckBtn = createDialogButton("🚚 Truck (" + TRUCK_COST + "$)", "Áruk szállítása", new Color(70, 130, 180));
         truckBtn.addActionListener(e -> {
             result[0] = 1;
             dialog.dispose();
         });
 
-        JButton advBusBtn = createDialogButton("🚍 Advanced Bus", "Nagyobb kapacitású utasszállítás", new Color(0, 191, 255));
+        JButton advBusBtn = createDialogButton("🚍 Advanced Bus (" + ADVANCED_BUS_COST + "$)", "Nagyobb kapacitású utasszállítás", new Color(0, 191, 255));
         advBusBtn.addActionListener(e -> {
             result[0] = 2;
             dialog.dispose();
         });
 
-        JButton advTruckBtn = createDialogButton("🚛 Advanced Truck", "Nagyobb kapacitású áruszállítás", new Color(100, 149, 237));
+        JButton advTruckBtn = createDialogButton("🚛 Advanced Truck (" + ADVANCED_TRUCK_COST + "$)", "Nagyobb kapacitású áruszállítás", new Color(100, 149, 237));
         advTruckBtn.addActionListener(e -> {
             result[0] = 3;
             dialog.dispose();
